@@ -61,6 +61,9 @@ export const resolveReaLaunch = (
   if (existsSync(join(fork, "dist", "main.js")) && existsSync(forkScript)) {
     return { ...launchFromScript(forkScript, "fork"), root: fork };
   }
+  // Prefer the REA installed with the Node running Studio, then PATH.
+  const besideNode = join(dirname(process.execPath), "rea");
+  if (existsSync(besideNode)) return launchFromScript(besideNode, "path");
   const onPath = findOnPath("rea", env);
   if (onPath) return launchFromScript(onPath, "path");
   return { command: "npx", args: ["-y", PINNED_REA_PACKAGE, "mcp"], source: "npx" };
