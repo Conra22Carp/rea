@@ -26,7 +26,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "REA Studio",
+  title: "Reall",
   description: "Clone and enhance applications with REA and the model you choose.",
 };
 
@@ -46,10 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <aside className="flex shrink-0 flex-col gap-8 border-rule px-6 py-6 md:sticky md:top-0 md:h-screen md:w-56 md:border-r md:py-10">
             <Link href="/" className="group flex flex-col leading-none">
               <span className="font-display text-[2.6rem] tracking-tight">
-                REA<span className="text-signal">.</span>
-              </span>
-              <span className="mt-1 font-mono text-[0.65rem] uppercase tracking-[0.3em] text-ink-2">
-                Studio
+                Reall<span className="text-signal">.</span>
               </span>
             </Link>
             <nav className="flex gap-4 md:flex-col md:gap-1">

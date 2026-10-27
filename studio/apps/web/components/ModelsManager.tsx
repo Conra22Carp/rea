@@ -204,7 +204,7 @@ export const ModelsManager = ({ models }: { models: readonly ModelSummary[] }) =
             </Button>
           </div>
           <p className="text-xs leading-relaxed text-ink-3">
-            Saving runs a short tool-calling check. REA Studio needs a model that can call tools.
+            Saving runs a short tool-calling check. Reall needs a model that can call tools.
           </p>
         </form>
       </Card>

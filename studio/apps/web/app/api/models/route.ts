@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     return json(
       {
         error: test.ok
-          ? "The model answered but did not call the test tool. REA Studio needs tool calling."
+          ? "The model answered but did not call the test tool. Reall needs tool calling."
           : `Connection failed: ${test.error ?? "unknown error"}`,
         test,
       },

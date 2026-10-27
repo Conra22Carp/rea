@@ -50,7 +50,7 @@ export default function JobsPage() {
   return (
     <>
       <PageTitle eyebrow="Jobs" title={<>See a feature. <em className="text-signal">Rebuild it better.</em></>}>
-        Point REA Studio at an app you are allowed to study, choose any model with your own API
+        Point Reall at an app you are allowed to study, choose any model with your own API
         key, and get a verified rebuild with the enhancement you want — another language, another
         stack, tests and hardening.
       </PageTitle>

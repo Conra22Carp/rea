@@ -45,7 +45,7 @@ export const json = (body: unknown, status = 200): Response =>
 export const guard = (request: Request): Response | undefined => {
   const host = request.headers.get("host");
   if (!isAllowedHost(host)) {
-    return json({ error: "This host is not allowed to reach REA Studio." }, 403);
+    return json({ error: "This host is not allowed to reach Reall." }, 403);
   }
   if (request.method !== "GET" && request.method !== "HEAD") {
     const origin = request.headers.get("origin");
