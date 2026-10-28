@@ -183,7 +183,6 @@ export function JobView({
         {t("Volver al proyecto", "Back to project")}
       </Link>
       <PageTitle
-        eyebrow={t("EN EJECUCIÓN, A TU VISTA", "EVERY STEP, IN SIGHT")}
         title={job.title}
         actions={
           <>
@@ -296,9 +295,6 @@ export function JobView({
           <Card key={approval.id} className="approval-card">
             <div className="section-heading">
               <div>
-                <span className="eyebrow">
-                  {t("TU DECISIÓN", "YOUR DECISION")}
-                </span>
                 <h2>
                   {approval.kind === "spec"
                     ? t("Revisá la especificación", "Review the specification")

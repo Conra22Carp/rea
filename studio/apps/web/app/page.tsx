@@ -3,15 +3,12 @@ import Link from "next/link";
 import {
   ArrowRight,
   ArrowUpRight,
-  Check,
   CheckCheck,
   Code2,
   Cpu,
-  FileCheck2,
   Fingerprint,
   FolderOpen,
   GitBranch,
-  Globe2,
   Layers3,
   ShieldCheck,
   Sparkles,
@@ -57,26 +54,12 @@ export default function HomePage() {
   ] as const;
   return (
     <div className="home-page">
-      <div className="home-intro">
-        <span className="eyebrow">
-          <span className="online-dot" />
-          {t("UN NUEVO PUNTO DE PARTIDA", "A NEW STARTING POINT")}
-        </span>
-        <span className="home-edition">REALL / STUDIO</span>
-      </div>
       <section className="hero">
         <div className="hero-copy">
-          <span className="hero-kicker">
-            <Sparkles size={14} />
-            {t(
-              "INGENIERÍA INVERSA, HACIA ADELANTE",
-              "REVERSE ENGINEERING. FORWARD THINKING.",
-            )}
-          </span>
           <h1>
             {t("Entendé cómo funciona.", "Understand how it works.")}
             <br />
-            <em>{t("Hacelo realidad.", "Make it real.")}</em>
+            {t("Hacelo realidad.", "Make it real.")}
           </h1>
           <p>
             {t(
@@ -94,101 +77,39 @@ export default function HomePage() {
               <ArrowUpRight size={15} />
             </a>
           </div>
-          <div className="hero-trust">
-            <span>
-              <Check size={13} />
-              {t("Tus API keys", "Your API keys")}
-            </span>
-            <span>
-              <Check size={13} />
-              {t("Código exportable", "Exportable code")}
-            </span>
-            <span>
-              <Check size={13} />
-              {t("Control de costos", "Cost control")}
-            </span>
-          </div>
         </div>
         <div
           className="hero-visual"
           aria-label={t(
-            "Ilustración del flujo de Reall",
-            "Illustration of the Reall workflow",
+            "Resumen del flujo de Reall",
+            "Overview of the Reall workflow",
           )}
         >
-          <div className="visual-grid" />
-          <div className="visual-orbit orbit-one" />
-          <div className="visual-orbit orbit-two" />
-          <div className="float-label">
-            <span className="online-dot" />
-            {t("De la idea al código", "From idea to code")}
+          <div className="process-header">
+            <span>REALL / WORKFLOW</span>
+            <span>{t("Tu proyecto", "Your project")}</span>
           </div>
-          <div className="visual-source">
-            <Globe2 size={18} />
-            <span>app.example</span>
-            <span className="mini-dots">•••</span>
-            <div className="source-skeleton">
-              <i />
-              <i />
-              <div>
-                <i />
-                <i />
-                <i />
+          <div className="process-steps">
+            {steps.map(([title, description], index) => (
+              <div className="process-step" key={title}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <strong>{title}</strong>
+                  <small>{description}</small>
+                </div>
+                <ArrowRight size={16} aria-hidden="true" />
               </div>
-            </div>
+            ))}
           </div>
-          <div className="visual-connector" />
-          <div className="visual-engine">
-            <span className="brand-symbol">
-              <span />
-              <span />
-              <span />
-            </span>
-          </div>
-          <div className="visual-code">
-            <div className="code-bar">
-              <span className="code-dots">● ● ●</span>
-              <span>your-next-idea / app.ts</span>
-            </div>
-            <pre>
-              <span className="code-comment">
-                // {t("El siguiente paso es tuyo.", "The next step is yours.")}
-              </span>
-              {"\n"}
-              <span className="code-purple">export async function</span>
-              {" build() {\n  "}
-              <span className="code-purple">const</span>
-              {" idea = "}
-              <span className="code-green">await</span>
-              {" understand();\n  "}
-              <span className="code-purple">return</span>
-              {" create({\n    ...idea,\n    "}
-              <span className="code-green">possibilities</span>
-              {": "}
-              <span className="code-orange">'endless'</span>
-              {"\n  });\n}"}
-            </pre>
-            <div className="code-status">
-              <Check size={12} />
-              {t(
-                "Tu código. Tu carpeta. Tus reglas.",
-                "Your code. Your folder. Your rules.",
-              )}
-            </div>
-          </div>
-          <div className="visual-badge">
-            <FileCheck2 size={19} />
-            <div>
-              <strong>{t("Evidencia → código", "Evidence → code")}</strong>
-              <small>
-                {t("Un flujo, de principio a fin", "One workflow, end to end")}
-              </small>
-            </div>
+          <div className="process-output">
+            <Code2 size={17} aria-hidden="true" />
+            <code>project/output/</code>
+            <span>{t("Tu código", "Your code")}</span>
           </div>
         </div>
       </section>
       <section className="provider-strip">
-        <p>{t("EL MODELO LO ELEGÍS VOS", "THE MODEL IS YOUR CHOICE")}</p>
+        <p>{t("Tu modelo", "Your model")}</p>
         <div>
           <span>
             <span className="provider-logo">◉</span>OpenAI
@@ -214,7 +135,6 @@ export default function HomePage() {
       <section id="how-it-works" className="how-section">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">{t("UN FLUJO CLARO", "A CLEAR WORKFLOW")}</p>
             <h2>
               {t(
                 "De observar a crear. Sin perder el control.",
@@ -275,16 +195,10 @@ export default function HomePage() {
       </section>
       <section className="home-cta">
         <div>
-          <span className="eyebrow">
-            {t(
-              "EL PRÓXIMO PROYECTO EMPIEZA ACÁ",
-              "YOUR NEXT PROJECT STARTS HERE",
-            )}
-          </span>
           <h2>
             {t(
-              "Una buena idea merece ser Reall.",
-              "A good idea deserves to be Reall.",
+              "Configurá tus modelos y empezá.",
+              "Set up your models and get started.",
             )}
           </h2>
         </div>

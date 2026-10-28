@@ -74,23 +74,17 @@ export const Card = ({
   children: ReactNode;
   className?: string;
 }) => <section className={`card ${className}`}>{children}</section>;
-export const Eyebrow = ({ children }: { children: ReactNode }) => (
-  <p className="eyebrow">{children}</p>
-);
 export const PageTitle = ({
-  eyebrow,
   title,
   children,
   actions,
 }: {
-  eyebrow?: string;
   title: ReactNode;
   children?: ReactNode;
   actions?: ReactNode;
 }) => (
   <header className="page-heading">
     <div>
-      {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
       <h1>{title}</h1>
       {children && <p className="page-description">{children}</p>}
     </div>

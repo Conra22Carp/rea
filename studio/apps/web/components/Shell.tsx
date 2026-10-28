@@ -50,7 +50,6 @@ export function Shell({ children }: { children: ReactNode }) {
           </span>
           Reall<span className="brand-dot">.</span>
         </Link>
-        <div className="sidebar-caption">YOUR IDEAS. REAL CODE.</div>
         <Link
           href="/projects/new"
           className="sidebar-create"
@@ -59,7 +58,6 @@ export function Shell({ children }: { children: ReactNode }) {
           <Plus size={17} />
           {t("Crear proyecto", "Create project")}
         </Link>
-        <p className="nav-caption">WORKSPACE</p>
         <nav aria-label={t("Navegación principal", "Main navigation")}>
           {nav.map(({ href, text, icon: Icon }) => (
             <Link
@@ -71,21 +69,10 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               <Icon size={18} />
               <span>{text}</span>
-              {active.href === href && <span className="nav-active-dot" />}
             </Link>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="local-card">
-            <span className="online-dot" />
-            {t("Tu espacio local", "Your local workspace")}
-            <p>
-              {t(
-                "Tus modelos. Tus claves. Tu código.",
-                "Your models. Your keys. Your code.",
-              )}
-            </p>
-          </div>
           <a
             href="https://artesia.ar"
             target="_blank"
@@ -133,7 +120,6 @@ export function Shell({ children }: { children: ReactNode }) {
                 </button>
               ))}
             </div>
-            <span className="avatar">C</span>
           </div>
         </header>
         <main id="main-content" className="main-content">

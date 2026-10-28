@@ -77,7 +77,6 @@ export function Dashboard({ initial }: { initial: UsageSnapshot }) {
   return (
     <>
       <PageTitle
-        eyebrow={t("CADA TOKEN, A LA VISTA", "EVERY TOKEN, IN SIGHT")}
         title={t("Consumo en vivo", "Live usage")}
         actions={
           <span className={`live-indicator ${live ? "connected" : ""}`}>

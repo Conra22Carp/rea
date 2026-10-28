@@ -40,7 +40,6 @@ export function Projects({
   return (
     <>
       <PageTitle
-        eyebrow={t("TU ESPACIO DE CREACIÓN", "YOUR CREATIVE WORKSPACE")}
         title={t("Tus proyectos", "Your projects")}
         actions={
           <Link href="/projects/new" className={buttonClass("primary")}>
@@ -192,7 +191,6 @@ export function ProjectDetail({
         ← {t("Proyectos", "Projects")}
       </Link>
       <PageTitle
-        eyebrow={t("PROYECTO", "PROJECT")}
         title={project.name}
         actions={
           <Link

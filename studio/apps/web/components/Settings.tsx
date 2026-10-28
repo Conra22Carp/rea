@@ -153,10 +153,7 @@ export function Settings({
           {t("Volver a crear el proyecto", "Back to creating your project")}
         </Link>
       )}
-      <PageTitle
-        eyebrow={t("TU ESPACIO, A TU MEDIDA", "YOUR WORKSPACE, YOUR WAY")}
-        title={t("Configuración", "Settings")}
-      >
+      <PageTitle title={t("Configuración", "Settings")}>
         {t(
           "Conectá tus proveedores y definí cómo querés trabajar.",
           "Connect your providers and make this workspace yours.",
@@ -211,9 +208,6 @@ export function Settings({
             <Card>
               <div className="section-heading">
                 <div>
-                  <span className="eyebrow">
-                    {t("CONEXIONES", "CONNECTIONS")}
-                  </span>
                   <h2>{t("Tus proveedores de IA", "Your AI providers")}</h2>
                 </div>
                 <Tag>{connections.length}</Tag>

@@ -6,8 +6,6 @@ import { getStore, isAllowedHost } from "@/lib/server";
 import { LocaleProvider } from "@/components/Locale";
 import { Shell } from "@/components/Shell";
 import "@fontsource-variable/inter";
-import "@fontsource/instrument-serif/400.css";
-import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "Reall — Ideas into real code", template: "%s · Reall" },

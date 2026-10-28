@@ -168,10 +168,7 @@ export function JobWizard({
         <ArrowLeft size={14} />
         {project.name}
       </Link>
-      <PageTitle
-        eyebrow={t("NUEVA EJECUCIÓN", "NEW RUN")}
-        title={t("¿Qué vamos a construir?", "What are we building?")}
-      >
+      <PageTitle title={t("¿Qué vamos a construir?", "What are we building?")}>
         {t(
           "Definí el objetivo. Reall te acompaña del análisis al código verificado.",
           "Define the target. Reall takes you from analysis to verified code.",
@@ -852,7 +849,6 @@ export function JobWizard({
           </div>
         </Card>
         <aside className="project-summary card">
-          <span className="eyebrow">{t("TU PROYECTO", "YOUR PROJECT")}</span>
           <h3>{project.name}</h3>
           <div className="summary-item">
             <Cpu size={18} />
