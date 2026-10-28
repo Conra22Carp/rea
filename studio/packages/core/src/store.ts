@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { accessSync, constants, mkdirSync, realpathSync } from "node:fs";
+import { isAbsolute, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { isProviderId, type ProviderId } from "./catalog.js";
 import { createSecretBox, loadMasterKey, type SecretBox } from "./crypto.js";
-import { studioPaths } from "./paths.js";
+import { createDirectoryTree, studioPaths } from "./paths.js";
+import { presetFor, type ModelPricing } from "./pricing.js";
 import type {
   ApprovalKind,
   ApprovalRequest,
@@ -24,12 +25,41 @@ export interface ModelRecord {
   readonly baseURL?: string;
   readonly hasApiKey: boolean;
   readonly createdAt: string;
+  readonly connectionId?: string;
+  readonly pricing?: ModelPricing;
+}
+
+export interface ConnectionRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly provider: ProviderId;
+  readonly baseURL?: string;
+  readonly hasApiKey: boolean;
+  readonly createdAt: string;
+}
+export interface ProjectRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly modelId: string;
+  readonly outputDirectory: string;
+  readonly createdAt: string;
+}
+export interface StudioSettings {
+  readonly language: "es" | "en";
+  readonly defaultOutputDirectory: string;
+  readonly defaultModelId: string;
+  readonly maxTotalTokens: number;
+  readonly maxStepsPerPhase: number;
+  readonly specReview: boolean;
 }
 
 export interface JobUsage {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly totalTokens: number;
+  readonly estimatedCostUsd?: number;
+  readonly unpricedTokens?: number;
 }
 
 export interface JobRecord {
@@ -44,6 +74,8 @@ export interface JobRecord {
   readonly updatedAt: string;
   readonly error?: string;
   readonly usage: JobUsage;
+  readonly projectId?: string;
+  readonly pricing?: { analysis?: ModelPricing; build?: ModelPricing };
 }
 
 export interface StoredEvent {
@@ -109,6 +141,15 @@ CREATE TABLE IF NOT EXISTS approvals (
   decided_at TEXT
 );
 CREATE INDEX IF NOT EXISTS approvals_job ON approvals(job_id, status);
+CREATE TABLE IF NOT EXISTS connections (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, provider TEXT NOT NULL,
+  base_url TEXT, api_key_enc TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL,
+  model_id TEXT NOT NULL, output_directory TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY CHECK(id = 1), data_json TEXT NOT NULL);
 `;
 
 type Row = Record<string, unknown>;
@@ -132,10 +173,189 @@ export class StudioStore {
     this.db = new DatabaseSync(paths.database);
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
     this.db.exec(SCHEMA);
+    // Additive migrations preserve installations created before projects existed.
+    for (const [table, column] of [
+      ["models", "connection_id"],
+      ["models", "pricing_json"],
+      ["jobs", "project_id"],
+      ["jobs", "pricing_json"],
+    ]) {
+      if (!table || !column) continue;
+      const fields = this.db.prepare(`PRAGMA table_info(${table})`).all();
+      if (!fields.some((field) => field.name === column))
+        this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT`);
+    }
   }
 
   close(): void {
     this.db.close();
+  }
+
+  getSettings(): StudioSettings {
+    const row = this.db
+      .prepare("SELECT data_json FROM settings WHERE id = 1")
+      .get() as Row | undefined;
+    const defaults: StudioSettings = {
+      language: "es",
+      defaultOutputDirectory: join(this.jobsDir, "..", "projects"),
+      defaultModelId: "",
+      maxTotalTokens: 200_000,
+      maxStepsPerPhase: 60,
+      specReview: true,
+    };
+    return {
+      ...defaults,
+      ...(row
+        ? (JSON.parse(text(row, "data_json")) as Partial<StudioSettings>)
+        : {}),
+    };
+  }
+
+  saveSettings(settings: StudioSettings): StudioSettings {
+    this.db
+      .prepare(
+        "INSERT INTO settings (id, data_json) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data_json = excluded.data_json",
+      )
+      .run(JSON.stringify(settings));
+    return this.getSettings();
+  }
+
+  listConnections(): ConnectionRecord[] {
+    return this.db
+      .prepare("SELECT * FROM connections ORDER BY created_at DESC")
+      .all()
+      .map((value) => {
+        const row = value as Row;
+        const baseURL = optionalText(row, "base_url");
+        return {
+          id: text(row, "id"),
+          name: text(row, "name"),
+          provider: text(row, "provider") as ProviderId,
+          hasApiKey: Boolean(row.api_key_enc),
+          createdAt: text(row, "created_at"),
+          ...(baseURL ? { baseURL } : {}),
+        };
+      });
+  }
+
+  saveConnection(input: {
+    id?: string;
+    name: string;
+    provider: ProviderId;
+    baseURL?: string;
+    apiKey?: string;
+  }): ConnectionRecord {
+    const existing = input.id
+      ? this.listConnections().find((item) => item.id === input.id)
+      : undefined;
+    if (input.id && !existing) throw new Error("Connection not found.");
+    if (
+      existing &&
+      (existing.provider !== input.provider ||
+        (existing.baseURL ?? "") !== (input.baseURL ?? ""))
+    )
+      throw new Error(
+        "Create a new connection to change its provider or endpoint.",
+      );
+    const id = input.id ?? randomUUID();
+    if (existing) {
+      this.db
+        .prepare(
+          "UPDATE connections SET name = ?, api_key_enc = COALESCE(?, api_key_enc) WHERE id = ?",
+        )
+        .run(
+          input.name,
+          input.apiKey ? this.#box.seal(input.apiKey) : null,
+          id,
+        );
+    } else {
+      this.db
+        .prepare("INSERT INTO connections VALUES (?, ?, ?, ?, ?, ?)")
+        .run(
+          id,
+          input.name,
+          input.provider,
+          input.baseURL || null,
+          input.apiKey ? this.#box.seal(input.apiKey) : null,
+          now(),
+        );
+    }
+    return this.listConnections().find((item) => item.id === id)!;
+  }
+
+  getConnectionConfig(id: string): Omit<ModelConfig, "model"> | undefined {
+    const row = this.db
+      .prepare("SELECT * FROM connections WHERE id = ?")
+      .get(id) as Row | undefined;
+    if (!row || !isProviderId(row.provider)) return undefined;
+    const key = optionalText(row, "api_key_enc");
+    const base = optionalText(row, "base_url");
+    return {
+      provider: row.provider,
+      ...(key ? { apiKey: this.#box.open(key) } : {}),
+      ...(base ? { baseURL: base } : {}),
+    };
+  }
+
+  deleteConnection(id: string): void {
+    if (
+      this.db
+        .prepare("SELECT id FROM models WHERE connection_id = ? LIMIT 1")
+        .get(id)
+    )
+      throw new Error("Remove the saved models using this connection first.");
+    this.db.prepare("DELETE FROM connections WHERE id = ?").run(id);
+  }
+
+  listProjects(): ProjectRecord[] {
+    return this.db
+      .prepare("SELECT * FROM projects ORDER BY created_at DESC")
+      .all()
+      .map((value) => {
+        const r = value as Row;
+        return {
+          id: text(r, "id"),
+          name: text(r, "name"),
+          description: text(r, "description"),
+          modelId: text(r, "model_id"),
+          outputDirectory: text(r, "output_directory"),
+          createdAt: text(r, "created_at"),
+        };
+      });
+  }
+
+  getProject(id: string): ProjectRecord | undefined {
+    return this.listProjects().find((project) => project.id === id);
+  }
+
+  createProject(input: {
+    name: string;
+    description: string;
+    modelId: string;
+    outputDirectory: string;
+  }): ProjectRecord {
+    if (!this.getModel(input.modelId))
+      throw new Error("Choose an available saved model.");
+    if (!isAbsolute(input.outputDirectory))
+      throw new Error("Choose an absolute folder on this machine.");
+    createDirectoryTree(input.outputDirectory);
+    const parent = realpathSync(input.outputDirectory);
+    accessSync(parent, constants.W_OK);
+    const id = randomUUID();
+    const slug =
+      input.name
+        .normalize("NFKD")
+        .replace(/[^a-zA-Z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 48) || "project";
+    const directory = join(parent, `${slug}-${id.slice(0, 8)}`);
+    // A fresh owned directory: never merge into or overwrite an existing project.
+    mkdirSync(directory, { mode: 0o700 });
+    this.db
+      .prepare("INSERT INTO projects VALUES (?, ?, ?, ?, ?, ?)")
+      .run(id, input.name, input.description, input.modelId, directory, now());
+    return this.getProject(id)!;
   }
 
   // Models ------------------------------------------------------------------
@@ -158,11 +378,13 @@ export class StudioStore {
     model: string;
     baseURL?: string;
     apiKey?: string;
+    connectionId?: string;
+    pricing?: ModelPricing;
   }): ModelRecord {
     const id = randomUUID();
     this.db
       .prepare(
-        "INSERT INTO models (id, name, provider, model, base_url, api_key_enc, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO models (id, name, provider, model, base_url, api_key_enc, created_at, connection_id, pricing_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
       .run(
         id,
@@ -172,6 +394,14 @@ export class StudioStore {
         input.baseURL || null,
         input.apiKey ? this.#box.seal(input.apiKey) : null,
         now(),
+        input.connectionId ?? null,
+        JSON.stringify(
+          input.pricing ??
+            (input.baseURL
+              ? null
+              : presetFor(input.provider, input.model)?.pricing) ??
+            null,
+        ),
       );
     const created = this.getModel(id);
     if (!created) throw new Error("Model was not stored.");
@@ -179,6 +409,17 @@ export class StudioStore {
   }
 
   deleteModel(id: string): void {
+    if (
+      this.db
+        .prepare("SELECT id FROM projects WHERE model_id = ? LIMIT 1")
+        .get(id) ||
+      this.db
+        .prepare(
+          "SELECT id FROM jobs WHERE (analysis_model_id = ? OR build_model_id = ?) AND status IN ('queued','running','waiting_approval') LIMIT 1",
+        )
+        .get(id, id)
+    )
+      throw new Error("This model is used by a project or an active job.");
     this.db.prepare("DELETE FROM models WHERE id = ?").run(id);
   }
 
@@ -192,25 +433,43 @@ export class StudioStore {
     if (!isProviderId(provider)) return undefined;
     const sealed = optionalText(row, "api_key_enc");
     const baseURL = optionalText(row, "base_url");
+    const connectionId = optionalText(row, "connection_id");
+    const connection = connectionId
+      ? this.getConnectionConfig(connectionId)
+      : undefined;
+    if (connectionId && !connection) return undefined;
+    const pricing = this.#modelRecord(row).pricing;
     return {
       provider,
       model: text(row, "model"),
       ...(sealed ? { apiKey: this.#box.open(sealed) } : {}),
       ...(baseURL ? { baseURL } : {}),
+      ...connection,
+      ...(pricing ? { pricing } : {}),
     };
   }
 
   #modelRecord(row: Row): ModelRecord {
     const provider = text(row, "provider");
     const baseURL = optionalText(row, "base_url");
+    const connectionId = optionalText(row, "connection_id");
+    const connection = connectionId
+      ? this.listConnections().find((item) => item.id === connectionId)
+      : undefined;
+    const pricing = row.pricing_json
+      ? (JSON.parse(String(row.pricing_json)) as ModelPricing | null)
+      : undefined;
     return {
       id: text(row, "id"),
       name: text(row, "name"),
       provider: isProviderId(provider) ? provider : "openai-compatible",
       model: text(row, "model"),
       ...(baseURL ? { baseURL } : {}),
-      hasApiKey: optionalText(row, "api_key_enc") !== undefined,
+      hasApiKey:
+        connection?.hasApiKey ?? optionalText(row, "api_key_enc") !== undefined,
       createdAt: text(row, "created_at"),
+      ...(connectionId ? { connectionId } : {}),
+      ...(pricing ? { pricing } : {}),
     };
   }
 
@@ -221,13 +480,22 @@ export class StudioStore {
     secrets: JobSecrets;
     analysisModelId: string;
     buildModelId: string;
+    projectId?: string;
   }): JobRecord {
     const id = randomUUID();
-    const workspace = join(this.jobsDir, id);
+    const project = input.projectId
+      ? this.getProject(input.projectId)
+      : undefined;
+    if (input.projectId && !project) throw new Error("Project not found.");
+    const workspace = join(project?.outputDirectory ?? this.jobsDir, id);
+    const pricing = {
+      analysis: this.getModel(input.analysisModelId)?.pricing,
+      build: this.getModel(input.buildModelId)?.pricing,
+    };
     const ts = now();
     this.db
       .prepare(
-        "INSERT INTO jobs (id, title, status, spec_json, secrets_enc, analysis_model_id, build_model_id, workspace, created_at, updated_at) VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO jobs (id, title, status, spec_json, secrets_enc, analysis_model_id, build_model_id, workspace, created_at, updated_at, project_id, pricing_json) VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
       .run(
         id,
@@ -239,6 +507,8 @@ export class StudioStore {
         workspace,
         ts,
         ts,
+        input.projectId ?? null,
+        JSON.stringify(pricing),
       );
     const job = this.getJob(id);
     if (!job) throw new Error("Job was not stored.");
@@ -285,7 +555,9 @@ export class StudioStore {
 
   setJobStatus(id: string, status: JobStatus, error?: string): void {
     this.db
-      .prepare("UPDATE jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?")
+      .prepare(
+        "UPDATE jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?",
+      )
       .run(status, error ?? null, now(), id);
   }
 
@@ -298,7 +570,9 @@ export class StudioStore {
   /** Queued jobs are cancelled at once; running jobs stop at the next check. */
   requestCancel(id: string): void {
     this.db
-      .prepare("UPDATE jobs SET cancel_requested = 1, updated_at = ? WHERE id = ?")
+      .prepare(
+        "UPDATE jobs SET cancel_requested = 1, updated_at = ? WHERE id = ?",
+      )
       .run(now(), id);
     this.db
       .prepare(
@@ -338,6 +612,15 @@ export class StudioStore {
       updatedAt: text(row, "updated_at"),
       ...(error ? { error } : {}),
       usage: JSON.parse(text(row, "usage_json")) as JobUsage,
+      ...(row.project_id ? { projectId: text(row, "project_id") } : {}),
+      ...(row.pricing_json
+        ? {
+            pricing: JSON.parse(String(row.pricing_json)) as {
+              analysis?: ModelPricing;
+              build?: ModelPricing;
+            },
+          }
+        : {}),
     };
   }
 
@@ -345,7 +628,9 @@ export class StudioStore {
 
   appendEvent(jobId: string, event: JobEvent): number {
     const result = this.db
-      .prepare("INSERT INTO job_events (job_id, ts, data_json) VALUES (?, ?, ?)")
+      .prepare(
+        "INSERT INTO job_events (job_id, ts, data_json) VALUES (?, ?, ?)",
+      )
       .run(jobId, now(), JSON.stringify(event));
     return Number(result.lastInsertRowid);
   }
@@ -385,7 +670,10 @@ export class StudioStore {
     return row ? this.#approvalRecord(row as Row) : undefined;
   }
 
-  listApprovals(jobId: string, status?: ApprovalRecord["status"]): ApprovalRecord[] {
+  listApprovals(
+    jobId: string,
+    status?: ApprovalRecord["status"],
+  ): ApprovalRecord[] {
     const rows = status
       ? this.db
           .prepare(
@@ -393,7 +681,9 @@ export class StudioStore {
           )
           .all(jobId, status)
       : this.db
-          .prepare("SELECT * FROM approvals WHERE job_id = ? ORDER BY created_at")
+          .prepare(
+            "SELECT * FROM approvals WHERE job_id = ? ORDER BY created_at",
+          )
           .all(jobId);
     return rows.map((row) => this.#approvalRecord(row as Row));
   }

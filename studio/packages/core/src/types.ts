@@ -6,6 +6,7 @@ import type {
   ScopeMode,
   TargetKind,
 } from "./catalog.js";
+import type { ModelPricing } from "./pricing.js";
 
 /** A model selection. `apiKey` is only present while decrypted in memory. */
 export interface ModelConfig {
@@ -13,6 +14,7 @@ export interface ModelConfig {
   readonly model: string;
   readonly apiKey?: string;
   readonly baseURL?: string;
+  readonly pricing?: ModelPricing;
 }
 
 /** Non-secret cookie metadata the agent may see; values live in JobSecrets. */
@@ -32,6 +34,7 @@ export interface EnhancementSpec {
 }
 
 export interface JobSpec {
+  readonly language?: "es" | "en";
   readonly title: string;
   readonly target: {
     readonly kind: TargetKind;
@@ -52,6 +55,7 @@ export interface JobSpec {
   readonly budget: {
     readonly maxStepsPerPhase: number;
     readonly maxTotalTokens?: number;
+    readonly maxCostUsd?: number;
   };
   readonly approvals: {
     readonly destructiveTools: "ask" | "auto";
@@ -126,6 +130,12 @@ export type JobEvent =
       readonly inputTokens: number;
       readonly outputTokens: number;
       readonly totalTokens: number;
+      readonly stepInputTokens?: number;
+      readonly stepOutputTokens?: number;
+      readonly estimatedCostUsd?: number;
+      readonly unpricedTokens?: number;
+      readonly model?: string;
+      readonly provider?: ProviderId;
     }
   | {
       readonly type: "file";

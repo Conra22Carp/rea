@@ -1,11 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import {
-  mkdir,
-  readdir,
-  readFile,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { tool, type ToolSet } from "ai";
@@ -78,7 +72,10 @@ export class Workspace {
 
   async prepare(): Promise<void> {
     for (const dir of WORKSPACE_DIRS) {
-      await mkdir(join(this.root, dir), { recursive: true });
+      // These directories are runtime job data, not application build assets.
+      await mkdir(join(/* turbopackIgnore: true */ this.root, dir), {
+        recursive: true,
+      });
     }
   }
 
@@ -88,7 +85,9 @@ export class Workspace {
 
   /** Resolve a model-supplied path and refuse anything outside the job. */
   resolveInside(path: string): string {
-    const absolute = isAbsolute(path) ? resolve(path) : resolve(this.root, path);
+    const absolute = isAbsolute(path)
+      ? resolve(path)
+      : resolve(this.root, path);
     const rel = relative(this.root, absolute);
     if (rel.startsWith("..") || isAbsolute(rel)) {
       throw new Error(`Path ${path} is outside the job workspace.`);
@@ -134,15 +133,12 @@ export class Workspace {
       }
     };
     await walk(start, 1);
-    if (lines.length >= limit) lines.push(`… listing stopped at ${limit} entries`);
+    if (lines.length >= limit)
+      lines.push(`… listing stopped at ${limit} entries`);
     return lines;
   }
 
-  async grep(
-    pattern: string,
-    path: string,
-    limit = 200,
-  ): Promise<string[]> {
+  async grep(pattern: string, path: string, limit = 200): Promise<string[]> {
     const regex = new RegExp(pattern, "u");
     const start = this.resolveInside(path);
     const matches: string[] = [];
@@ -213,7 +209,12 @@ export class Workspace {
   startBackground(command: string, cwd: string): string {
     const id = `proc_${this.#processes.size + 1}`;
     const child = this.#spawn(command, cwd);
-    const entry: BackgroundProcess = { child, command, output: "", exitCode: null };
+    const entry: BackgroundProcess = {
+      child,
+      command,
+      output: "",
+      exitCode: null,
+    };
     const append = (chunk: Buffer) => {
       entry.output = (entry.output + chunk.toString("utf8")).slice(-50_000);
     };
@@ -400,7 +401,11 @@ export const workspaceTools = (
             const target = ws.resolveWritable(input.path);
             await mkdir(dirname(target), { recursive: true });
             await writeFile(target, input.content, "utf8");
-            ctx.emit({ type: "file", path: ws.relativePath(target), action: "write" });
+            ctx.emit({
+              type: "file",
+              path: ws.relativePath(target),
+              action: "write",
+            });
             return `Wrote ${ws.relativePath(target)} (${input.content.length} characters).`;
           },
         ),
@@ -434,7 +439,11 @@ export const workspaceTools = (
               ? content.split(input.old_string).join(input.new_string)
               : content.replace(input.old_string, () => input.new_string);
             await writeFile(target, updated, "utf8");
-            ctx.emit({ type: "file", path: ws.relativePath(target), action: "edit" });
+            ctx.emit({
+              type: "file",
+              path: ws.relativePath(target),
+              action: "edit",
+            });
             return `Edited ${ws.relativePath(target)} (${input.replace_all ? count : 1} replacement).`;
           },
         ),

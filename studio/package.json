@@ -2,7 +2,7 @@
   "name": "rea-studio",
   "version": "0.1.0",
   "private": true,
-  "description": "REA Studio: drive REA with any model and clone + enhance applications from a web UI.",
+  "description": "Reall: analyze, rebuild, and improve applications with your preferred model.",
   "license": "MIT",
   "type": "module",
   "workspaces": [

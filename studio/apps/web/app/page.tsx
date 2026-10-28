@@ -1,143 +1,298 @@
+"use client";
 import Link from "next/link";
-
-import { detectBrowserExecutable, loadSkill, resolveReaLaunch } from "@rea-studio/agent";
-import { LANGUAGES, TARGET_KINDS, type JobSpec } from "@rea-studio/core";
-
-import { buttonClass, Card, Eyebrow, PageTitle, StatusPill, Tag } from "@/components/ui";
-import { getStore, workerHeartbeat } from "@/lib/server";
-
-export const dynamic = "force-dynamic";
-
-const enhancementSummary = (spec: JobSpec): string => {
-  const parts: string[] = [];
-  const { port, stack, hardening } = spec.enhancement;
-  if (port) {
-    const language = LANGUAGES.find((item) => item.id === port.language)?.label ?? port.language;
-    parts.push(`→ ${language}${port.framework ? ` / ${port.framework}` : ""}`);
-  }
-  if (stack) parts.push(stack);
-  if (hardening.length) parts.push(`+ ${hardening.join(", ")}`);
-  return parts.join(" · ") || "faithful rebuild";
-};
-
-const ago = (iso: string): string => {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return `${Math.round(seconds)}s ago`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
-  if (seconds < 86_400) return `${Math.round(seconds / 3600)}h ago`;
-  return new Date(iso).toLocaleDateString();
-};
-
-const SystemRow = ({ label, value, ok }: { label: string; value: string; ok: boolean }) => (
-  <div className="flex items-baseline justify-between gap-4 border-b border-dashed border-rule py-2 last:border-none">
-    <span className="font-mono text-[0.68rem] uppercase tracking-[0.12em] text-ink-2">{label}</span>
-    <span className={`truncate text-right font-mono text-xs ${ok ? "text-ink" : "text-warn"}`} title={value}>
-      {value}
-    </span>
-  </div>
-);
-
-export default function JobsPage() {
-  const store = getStore();
-  const jobs = store.listJobs();
-  const models = store.listModels();
-  const launch = resolveReaLaunch();
-  const browser = detectBrowserExecutable();
-  const skill = loadSkill(launch);
-  const heartbeat = workerHeartbeat();
-  const workerAlive = heartbeat !== undefined && Date.now() - heartbeat.getTime() < 15_000;
-
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  CheckCheck,
+  Code2,
+  Cpu,
+  FileCheck2,
+  Fingerprint,
+  FolderOpen,
+  GitBranch,
+  Globe2,
+  Layers3,
+  ShieldCheck,
+  Sparkles,
+  Terminal,
+} from "lucide-react";
+import { useLocale } from "@/components/Locale";
+import { buttonClass } from "@/components/ui";
+export default function HomePage() {
+  const { t } = useLocale();
+  const steps = [
+    [
+      t("Entendé", "Understand"),
+      t(
+        "Analizá la app y sus comportamientos con evidencia real.",
+        "Analyze the app and its behavior with real evidence.",
+      ),
+      Fingerprint,
+    ],
+    [
+      t("Diseñá", "Design"),
+      t(
+        "Revisá la especificación antes de generar código.",
+        "Review the specification before generating code.",
+      ),
+      Layers3,
+    ],
+    [
+      t("Construí", "Build"),
+      t(
+        "Elegí tu stack y generá una versión mejorada.",
+        "Choose your stack and generate an improved version.",
+      ),
+      Code2,
+    ],
+    [
+      t("Verificá", "Verify"),
+      t(
+        "Compará resultados, pruebas y diferencias.",
+        "Compare results, tests, and differences.",
+      ),
+      CheckCheck,
+    ],
+  ] as const;
   return (
-    <>
-      <PageTitle eyebrow="Jobs" title={<>See a feature. <em className="text-signal">Rebuild it better.</em></>}>
-        Point Reall at an app you are allowed to study, choose any model with your own API
-        key, and get a verified rebuild with the enhancement you want — another language, another
-        stack, tests and hardening.
-      </PageTitle>
-
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <Eyebrow>{jobs.length} job{jobs.length === 1 ? "" : "s"}</Eyebrow>
-            <Link href="/jobs/new" className={buttonClass("primary")}>
-              New clone
-            </Link>
-          </div>
-          {jobs.length === 0 ? (
-            <Card className="rise flex flex-col items-start gap-3 py-10">
-              <p className="font-display text-2xl">No jobs yet.</p>
-              <p className="max-w-md text-sm text-ink-2">
-                {models.length === 0
-                  ? "Start by adding a model: any provider, your key."
-                  : "Create your first clone: a URL, an app bundle, an APK or a binary."}
-              </p>
-              <Link
-                href={models.length === 0 ? "/models" : "/jobs/new"}
-                className={buttonClass("ghost")}
-              >
-                {models.length === 0 ? "Add a model" : "New clone"}
-              </Link>
-            </Card>
-          ) : (
-            <ol className="flex flex-col">
-              {jobs.map((job, index) => (
-                <li key={job.id} className="rise" style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}>
-                  <Link
-                    href={`/jobs/${job.id}`}
-                    className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 border-b border-rule py-4 hover:bg-card"
-                  >
-                    <span className="w-8 font-mono text-xs text-ink-3 group-hover:text-signal">
-                      {String(jobs.length - index).padStart(2, "0")}
-                    </span>
-                    <span className="flex min-w-0 flex-col gap-1">
-                      <span className="truncate font-display text-xl leading-tight">{job.title}</span>
-                      <span className="flex flex-wrap items-center gap-2 text-xs text-ink-2">
-                        <Tag>{TARGET_KINDS.find((kind) => kind.id === job.spec.target.kind)?.label}</Tag>
-                        <span className="truncate">{enhancementSummary(job.spec)}</span>
-                      </span>
-                    </span>
-                    <span className="flex flex-col items-end gap-1">
-                      <StatusPill status={job.status} />
-                      <span className="font-mono text-[0.68rem] text-ink-3">
-                        {ago(job.createdAt)} · {job.usage.totalTokens.toLocaleString()} tok
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-
-        <aside className="flex flex-col gap-4">
-          <Card>
-            <Eyebrow>Bench</Eyebrow>
-            <div className="mt-3">
-              <SystemRow
-                label="Worker"
-                value={workerAlive ? "running" : heartbeat ? `last seen ${ago(heartbeat.toISOString())}` : "not started"}
-                ok={workerAlive}
-              />
-              <SystemRow label="REA" value={`${launch.source} · ${launch.args.at(-2) ?? launch.command}`} ok={launch.source !== "npx"} />
-              <SystemRow label="Skill" value={skill.source ? "loaded" : "missing"} ok={Boolean(skill.source)} />
-              <SystemRow label="Browser" value={browser ?? "not found"} ok={Boolean(browser)} />
-              <SystemRow label="Models" value={String(models.length)} ok={models.length > 0} />
-            </div>
-            {!workerAlive ? (
-              <p className="mt-3 text-xs leading-relaxed text-ink-2">
-                Jobs run in the worker. Start everything with <code className="font-mono">npm run studio</code> in{" "}
-                <code className="font-mono">studio/</code>.
-              </p>
-            ) : null}
-            {!browser ? (
-              <p className="mt-2 text-xs leading-relaxed text-ink-2">
-                Web targets need Chrome or Chromium. Set <code className="font-mono">STUDIO_BROWSER_PATH</code> if it
-                is installed elsewhere.
-              </p>
-            ) : null}
-          </Card>
-        </aside>
+    <div className="home-page">
+      <div className="home-intro">
+        <span className="eyebrow">
+          <span className="online-dot" />
+          {t("UN NUEVO PUNTO DE PARTIDA", "A NEW STARTING POINT")}
+        </span>
+        <span className="home-edition">REALL / STUDIO</span>
       </div>
-    </>
+      <section className="hero">
+        <div className="hero-copy">
+          <span className="hero-kicker">
+            <Sparkles size={14} />
+            {t(
+              "INGENIERÍA INVERSA, HACIA ADELANTE",
+              "REVERSE ENGINEERING. FORWARD THINKING.",
+            )}
+          </span>
+          <h1>
+            {t("Entendé cómo funciona.", "Understand how it works.")}
+            <br />
+            <em>{t("Hacelo realidad.", "Make it real.")}</em>
+          </h1>
+          <p>
+            {t(
+              "Transformá aplicaciones en un nuevo punto de partida. Analizá, reconstruí y mejorá con IA, tus propios modelos y el código siempre en tus manos.",
+              "Turn applications into a new starting point. Analyze, rebuild, and improve with AI, your own models, and code that stays in your hands.",
+            )}
+          </p>
+          <div className="hero-actions">
+            <Link href="/projects/new" className={buttonClass("primary")}>
+              {t("Crear mi primer proyecto", "Create my first project")}
+              <ArrowRight size={17} />
+            </Link>
+            <a href="#how-it-works" className="text-link">
+              {t("Cómo funciona", "How it works")}
+              <ArrowUpRight size={15} />
+            </a>
+          </div>
+          <div className="hero-trust">
+            <span>
+              <Check size={13} />
+              {t("Tus API keys", "Your API keys")}
+            </span>
+            <span>
+              <Check size={13} />
+              {t("Código exportable", "Exportable code")}
+            </span>
+            <span>
+              <Check size={13} />
+              {t("Control de costos", "Cost control")}
+            </span>
+          </div>
+        </div>
+        <div
+          className="hero-visual"
+          aria-label={t(
+            "Ilustración del flujo de Reall",
+            "Illustration of the Reall workflow",
+          )}
+        >
+          <div className="visual-grid" />
+          <div className="visual-orbit orbit-one" />
+          <div className="visual-orbit orbit-two" />
+          <div className="float-label">
+            <span className="online-dot" />
+            {t("De la idea al código", "From idea to code")}
+          </div>
+          <div className="visual-source">
+            <Globe2 size={18} />
+            <span>app.example</span>
+            <span className="mini-dots">•••</span>
+            <div className="source-skeleton">
+              <i />
+              <i />
+              <div>
+                <i />
+                <i />
+                <i />
+              </div>
+            </div>
+          </div>
+          <div className="visual-connector" />
+          <div className="visual-engine">
+            <span className="brand-symbol">
+              <span />
+              <span />
+              <span />
+            </span>
+          </div>
+          <div className="visual-code">
+            <div className="code-bar">
+              <span className="code-dots">● ● ●</span>
+              <span>your-next-idea / app.ts</span>
+            </div>
+            <pre>
+              <span className="code-comment">
+                // {t("El siguiente paso es tuyo.", "The next step is yours.")}
+              </span>
+              {"\n"}
+              <span className="code-purple">export async function</span>
+              {" build() {\n  "}
+              <span className="code-purple">const</span>
+              {" idea = "}
+              <span className="code-green">await</span>
+              {" understand();\n  "}
+              <span className="code-purple">return</span>
+              {" create({\n    ...idea,\n    "}
+              <span className="code-green">possibilities</span>
+              {": "}
+              <span className="code-orange">'endless'</span>
+              {"\n  });\n}"}
+            </pre>
+            <div className="code-status">
+              <Check size={12} />
+              {t(
+                "Tu código. Tu carpeta. Tus reglas.",
+                "Your code. Your folder. Your rules.",
+              )}
+            </div>
+          </div>
+          <div className="visual-badge">
+            <FileCheck2 size={19} />
+            <div>
+              <strong>{t("Evidencia → código", "Evidence → code")}</strong>
+              <small>
+                {t("Un flujo, de principio a fin", "One workflow, end to end")}
+              </small>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="provider-strip">
+        <p>{t("EL MODELO LO ELEGÍS VOS", "THE MODEL IS YOUR CHOICE")}</p>
+        <div>
+          <span>
+            <span className="provider-logo">◉</span>OpenAI
+          </span>
+          <span className="anthropic-word">Anthropic</span>
+          <span>
+            <Sparkles size={19} />
+            Gemini
+          </span>
+          <span>
+            <GitBranch size={18} />
+            OpenRouter
+          </span>
+          <span>
+            <Terminal size={18} />
+            Ollama
+          </span>
+          <span className="custom-provider">
+            + {t("tu proveedor", "your provider")}
+          </span>
+        </div>
+      </section>
+      <section id="how-it-works" className="how-section">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{t("UN FLUJO CLARO", "A CLEAR WORKFLOW")}</p>
+            <h2>
+              {t(
+                "De observar a crear. Sin perder el control.",
+                "From observing to creating. Stay in control.",
+              )}
+            </h2>
+          </div>
+          <span className="section-note">
+            {t("Vos decidís en cada paso.", "Your decision, at every step.")}
+          </span>
+        </div>
+        <div className="steps-grid">
+          {steps.map(([title, description, Icon], i) => (
+            <article key={title} className="step-card">
+              <div className="step-top">
+                <span className="step-icon">
+                  <Icon size={20} />
+                </span>
+                <span className="step-number">0{i + 1}</span>
+              </div>
+              <h3>{title}</h3>
+              <p>{description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="features-row">
+        <div>
+          <FolderOpen size={21} />
+          <h3>{t("El código, donde quieras", "Code, wherever you want")}</h3>
+          <p>
+            {t(
+              "Elegí la carpeta de cada proyecto. Explorá los archivos y descargá todo en un ZIP.",
+              "Choose a folder for each project. Browse the files and download everything as a ZIP.",
+            )}
+          </p>
+        </div>
+        <div>
+          <Cpu size={21} />
+          <h3>{t("Cada token cuenta", "Every token counts")}</h3>
+          <p>
+            {t(
+              "Seguí el consumo y costo estimado en vivo, con presupuestos por ejecución.",
+              "Track live usage and estimated cost, with per-run budgets.",
+            )}
+          </p>
+        </div>
+        <div>
+          <ShieldCheck size={21} />
+          <h3>{t("Tus claves, bajo tu control", "Your keys, your control")}</h3>
+          <p>
+            {t(
+              "Claves cifradas en tu máquina. Se usan únicamente con el proveedor elegido.",
+              "Encrypted keys on your machine. Used only with your chosen provider.",
+            )}
+          </p>
+        </div>
+      </section>
+      <section className="home-cta">
+        <div>
+          <span className="eyebrow">
+            {t(
+              "EL PRÓXIMO PROYECTO EMPIEZA ACÁ",
+              "YOUR NEXT PROJECT STARTS HERE",
+            )}
+          </span>
+          <h2>
+            {t(
+              "Una buena idea merece ser Reall.",
+              "A good idea deserves to be Reall.",
+            )}
+          </h2>
+        </div>
+        <Link href="/settings" className={buttonClass("ghost")}>
+          {t("Configurar mis modelos", "Set up my models")}
+          <ArrowRight size={16} />
+        </Link>
+      </section>
+    </div>
   );
 }

@@ -6,7 +6,12 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 
-import { parseJobSpec, splitCookieExport, studioHome, type JobSecrets } from "@rea-studio/core";
+import {
+  parseJobSpec,
+  splitCookieExport,
+  studioHome,
+  type JobSecrets,
+} from "@rea-studio/core";
 
 import { badRequest, errorText, getStore, guard, json } from "@/lib/server";
 
@@ -23,10 +28,13 @@ interface JobPayload {
   secrets?: { username?: string; password?: string; cookiesJson?: string };
   analysisModelId?: string;
   buildModelId?: string;
+  projectId?: string;
 }
 
 const safeName = (name: string): string =>
-  basename(name).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120) || "artifact";
+  basename(name)
+    .replace(/[^A-Za-z0-9._-]/g, "_")
+    .slice(0, 120) || "artifact";
 
 /** Create a job from multipart form data: a `job` JSON field and an optional `artifact` file. */
 export async function POST(request: Request) {
@@ -45,7 +53,11 @@ export async function POST(request: Request) {
     return badRequest("The job field is not valid JSON.");
   }
   const store = getStore();
-  const analysisModelId = payload.analysisModelId ?? "";
+  const project = payload.projectId
+    ? store.getProject(payload.projectId)
+    : undefined;
+  if (payload.projectId && !project) return badRequest("Project not found.");
+  const analysisModelId = payload.analysisModelId || project?.modelId || "";
   const buildModelId = payload.buildModelId || analysisModelId;
   if (!store.getModel(analysisModelId) || !store.getModel(buildModelId)) {
     return badRequest("Choose a saved model for the job.");
@@ -61,14 +73,18 @@ export async function POST(request: Request) {
     await mkdir(dir, { recursive: true, mode: 0o700 });
     const path = join(dir, safeName(artifact.name));
     await pipeline(
-      Readable.fromWeb(artifact.stream() as unknown as WebReadableStream<Uint8Array>),
+      Readable.fromWeb(
+        artifact.stream() as unknown as WebReadableStream<Uint8Array>,
+      ),
       createWriteStream(path, { mode: 0o600 }),
     );
     target.path = path;
   } else if (typeof target.path === "string" && target.path.trim()) {
     const local = target.path.trim();
     if (!isAbsolute(local) || !existsSync(local)) {
-      return badRequest("The local path must be absolute and exist on this machine.");
+      return badRequest(
+        "The local path must be absolute and exist on this machine.",
+      );
     }
     target.path = local;
   }
@@ -76,24 +92,42 @@ export async function POST(request: Request) {
   const secrets: { -readonly [K in keyof JobSecrets]: JobSecrets[K] } = {};
   const given = payload.secrets ?? {};
   if (access.mode === "password") {
-    if (!given.password) return badRequest("Enter the password for the target login.");
+    if (!given.password)
+      return badRequest("Enter the password for the target login.");
     if (given.username) secrets.username = given.username;
     secrets.password = given.password;
   }
   if (access.mode === "storage") {
     try {
       const cookies = splitCookieExport(given.cookiesJson ?? "");
-      if (cookies.values.length === 0) return badRequest("The cookie export is empty.");
+      if (cookies.values.length === 0)
+        return badRequest("The cookie export is empty.");
       access.cookies = cookies.descriptors;
       secrets.cookieValues = cookies.values;
     } catch {
-      return badRequest("Paste cookies as a JSON array of {name, value, domain, path}.");
+      return badRequest(
+        "Paste cookies as a JSON array of {name, value, domain, path}.",
+      );
     }
   }
 
   try {
     const spec = parseJobSpec({ ...rawSpec, target, access });
-    const job = store.createJob({ spec, secrets, analysisModelId, buildModelId });
+    if (
+      spec.budget.maxCostUsd !== undefined &&
+      (!store.getModel(analysisModelId)?.pricing ||
+        !store.getModel(buildModelId)?.pricing)
+    )
+      return badRequest(
+        "A cost budget requires prices for both selected models.",
+      );
+    const job = store.createJob({
+      spec,
+      secrets,
+      analysisModelId,
+      buildModelId,
+      ...(project ? { projectId: project.id } : {}),
+    });
     return json({ job }, 201);
   } catch (cause) {
     return badRequest(errorText(cause));

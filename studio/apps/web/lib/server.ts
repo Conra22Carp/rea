@@ -11,26 +11,8 @@ export const getStore = (): StudioStore => {
   return globalStore.__reaStudioStore;
 };
 
-const allowedHostnames = (): Set<string> =>
-  new Set([
-    "localhost",
-    "127.0.0.1",
-    "::1",
-    ...(process.env.STUDIO_ALLOWED_HOSTS ?? "")
-      .split(",")
-      .map((host) => host.trim().toLowerCase())
-      .filter(Boolean),
-  ]);
-
-const hostnameOf = (host: string): string =>
-  host
-    .toLowerCase()
-    .replace(/:\d+$/, "")
-    .replace(/^\[(.*)\]$/, "$1");
-
-/** Studio is local: refuse other Host headers (DNS rebinding). */
-export const isAllowedHost = (host: string | null): boolean =>
-  host !== null && allowedHostnames().has(hostnameOf(host));
+export { isAllowedHost } from "./request-policy";
+import { isAllowedHost } from "./request-policy";
 
 export const json = (body: unknown, status = 200): Response =>
   Response.json(body, {
@@ -64,7 +46,8 @@ export const guard = (request: Request): Response | undefined => {
   return undefined;
 };
 
-export const badRequest = (message: string): Response => json({ error: message }, 400);
+export const badRequest = (message: string): Response =>
+  json({ error: message }, 400);
 export const notFoundJson = (): Response => json({ error: "Not found." }, 404);
 
 /** Last time the worker reported in, if it ever did. */
@@ -79,10 +62,16 @@ export const workerHeartbeat = (): Date | undefined => {
 };
 
 export const errorText = (cause: unknown): string => {
-  if (cause && typeof cause === "object" && "issues" in cause && Array.isArray(cause.issues)) {
+  if (
+    cause &&
+    typeof cause === "object" &&
+    "issues" in cause &&
+    Array.isArray(cause.issues)
+  ) {
     return cause.issues
-      .map((issue: { path?: unknown[]; message?: string }) =>
-        `${(issue.path ?? []).join(".") || "input"}: ${issue.message ?? "invalid"}`,
+      .map(
+        (issue: { path?: unknown[]; message?: string }) =>
+          `${(issue.path ?? []).join(".") || "input"}: ${issue.message ?? "invalid"}`,
       )
       .join("; ");
   }

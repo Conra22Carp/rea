@@ -3,16 +3,31 @@ import { basename, isAbsolute, relative, resolve } from "node:path";
 
 import {
   PHASES,
+  estimateTokenCost,
   type JobSecrets,
   type JobSpec,
   type ModelConfig,
   type PhaseId,
 } from "@rea-studio/core";
-import { isStepCount, ToolLoopAgent, type LanguageModel, type ToolSet } from "ai";
+import {
+  isStepCount,
+  ToolLoopAgent,
+  type LanguageModel,
+  type ToolSet,
+} from "ai";
 
 import { detectBrowserExecutable } from "./browser.js";
-import { errorMessage, type ApprovalGate, type Emit, type ToolContext } from "./context.js";
-import { baseInstructions, phasePrompt, type PromptContext } from "./prompts.js";
+import {
+  errorMessage,
+  type ApprovalGate,
+  type Emit,
+  type ToolContext,
+} from "./context.js";
+import {
+  baseInstructions,
+  phasePrompt,
+  type PromptContext,
+} from "./prompts.js";
 import { createLanguageModel } from "./providers.js";
 import { startRea, type ReaLaunch, type ReaSession } from "./rea.js";
 import { reaTools, type ReaToolDefinition } from "./reaTools.js";
@@ -23,7 +38,10 @@ import { Workspace, workspaceTools } from "./workspace.js";
 export interface RunJobOptions {
   readonly spec: JobSpec;
   readonly secrets: JobSecrets;
-  readonly models: { readonly analysis: ModelConfig; readonly build: ModelConfig };
+  readonly models: {
+    readonly analysis: ModelConfig;
+    readonly build: ModelConfig;
+  };
   readonly workspaceRoot: string;
   readonly emit: Emit;
   readonly approvals: ApprovalGate;
@@ -40,6 +58,8 @@ export interface Usage {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  estimatedCostUsd?: number;
+  unpricedTokens?: number;
 }
 
 export interface RunJobResult {
@@ -79,7 +99,11 @@ const MAX_SPEC_REVISIONS = 3;
 /** Secret ids the model may reference and the env vars REA reads them from. */
 export const secretEnvironment = (
   secrets: JobSecrets,
-): { env: Record<string, string>; ids: Record<string, string>; labels: Record<string, string> } => {
+): {
+  env: Record<string, string>;
+  ids: Record<string, string>;
+  labels: Record<string, string>;
+} => {
   const env: Record<string, string> = {};
   const ids: Record<string, string> = {};
   const labels: Record<string, string> = {};
@@ -116,7 +140,9 @@ const stageInput = async (ws: Workspace, path: string): Promise<string> => {
   return relative(ws.root, target);
 };
 
-const listAllTools = async (session: ReaSession): Promise<ReaToolDefinition[]> => {
+const listAllTools = async (
+  session: ReaSession,
+): Promise<ReaToolDefinition[]> => {
   const tools: ReaToolDefinition[] = [];
   let cursor: string | undefined;
   do {
@@ -135,7 +161,13 @@ const listAllTools = async (session: ReaSession): Promise<ReaToolDefinition[]> =
  */
 export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
   const { spec, emit } = options;
-  const usage: Usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+  const usage: Usage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    estimatedCostUsd: 0,
+    unpricedTokens: 0,
+  };
   const budget = new AbortController();
   const signal = AbortSignal.any([options.signal, budget.signal]);
   const ws = new Workspace(options.workspaceRoot);
@@ -173,7 +205,9 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
   try {
     await ws.prepare();
     await writeFile(ws.path("logs", "job.json"), JSON.stringify(spec, null, 2));
-    const inputPath = spec.target.path ? await stageInput(ws, spec.target.path) : undefined;
+    const inputPath = spec.target.path
+      ? await stageInput(ws, spec.target.path)
+      : undefined;
 
     session = await startRea({
       kind: spec.target.kind,
@@ -193,7 +227,8 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
       safeEmit({
         type: "log",
         level: "warn",
-        message: "REA's agent skill was not found; continuing with Studio's own instructions.",
+        message:
+          "REA's agent skill was not found; continuing with Studio's own instructions.",
       });
     }
     const browserExecutable = detectBrowserExecutable();
@@ -206,9 +241,12 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
       skillInstructions: skill.instructions,
       referenceNames: [...skill.references.keys()],
     };
-    const instructions = `${baseInstructions(prompt)}\n\nWorkspace root (absolute): ${ws.root}`;
+    const instructions = `${baseInstructions(prompt)}\n\nWorkspace root (absolute): ${ws.root}\nWrite user-facing reports and explanations in ${spec.language === "es" ? "Spanish" : "English"}. Keep code identifiers and technical evidence unchanged.`;
 
-    const runPhase = async (phase: PhaseId, feedback?: string): Promise<string> => {
+    const runPhase = async (
+      phase: PhaseId,
+      feedback?: string,
+    ): Promise<string> => {
       currentPhase = phase;
       ctx.phase = phase;
       const tools: ToolSet = {
@@ -232,20 +270,45 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
         abortSignal: signal,
         onStepEnd: (step) => {
           const text = step.text.trim();
-          if (text) safeEmit({ type: "text", phase, text: text.slice(0, 4_000) });
+          if (text)
+            safeEmit({ type: "text", phase, text: text.slice(0, 4_000) });
           const input = step.usage.inputTokens ?? 0;
           const output = step.usage.outputTokens ?? 0;
           usage.inputTokens += input;
           usage.outputTokens += output;
           usage.totalTokens += step.usage.totalTokens ?? input + output;
+          const selected = options.models[PHASE_MODEL[phase]];
+          const cost = estimateTokenCost(
+            selected.pricing,
+            input,
+            output,
+            step.usage.inputTokenDetails?.cacheReadTokens ?? 0,
+            step.usage.inputTokenDetails?.cacheWriteTokens ?? 0,
+          );
+          if (cost === undefined)
+            usage.unpricedTokens = (usage.unpricedTokens ?? 0) + input + output;
+          else usage.estimatedCostUsd = (usage.estimatedCostUsd ?? 0) + cost;
           safeEmit({
             type: "usage",
             phase,
             inputTokens: usage.inputTokens,
             outputTokens: usage.outputTokens,
             totalTokens: usage.totalTokens,
+            stepInputTokens: input,
+            stepOutputTokens: output,
+            estimatedCostUsd: usage.estimatedCostUsd ?? 0,
+            unpricedTokens: usage.unpricedTokens ?? 0,
+            model: selected.model,
+            provider: selected.provider,
           });
           options.onUsage?.({ ...usage });
+          if (
+            spec.budget.maxCostUsd !== undefined &&
+            (usage.estimatedCostUsd ?? 0) >= spec.budget.maxCostUsd
+          )
+            budget.abort(
+              new Error("The job reached its estimated cost budget."),
+            );
           if (
             spec.budget.maxTotalTokens !== undefined &&
             usage.totalTokens > spec.budget.maxTotalTokens
@@ -269,9 +332,10 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
       let summary = await runPhase(phase);
       if (phase === "spec" && spec.approvals.specReview) {
         for (let revision = 0; ; revision += 1) {
-          const specText = await readFile(ws.path(PHASE_OUTPUT.spec), "utf8").catch(
-            () => "(spec/feature-spec.md was not written)",
-          );
+          const specText = await readFile(
+            ws.path(PHASE_OUTPUT.spec),
+            "utf8",
+          ).catch(() => "(spec/feature-spec.md was not written)");
           const decision = await options.approvals.request({
             kind: "spec",
             title: "Review the specification before the build starts",
@@ -293,23 +357,42 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
     }
 
     if (signal.aborted) {
-      const reason = budget.signal.aborted ? errorMessage(budget.signal.reason) : undefined;
-      safeEmit({ type: "phase", phase: currentPhase, status: "failed", ...(reason ? { summary: reason } : {}) });
+      const reason = budget.signal.aborted
+        ? errorMessage(budget.signal.reason)
+        : undefined;
+      safeEmit({
+        type: "phase",
+        phase: currentPhase,
+        status: "failed",
+        ...(reason ? { summary: reason } : {}),
+      });
       const status = budget.signal.aborted ? "failed" : "cancelled";
       safeEmit({ type: "done", status, ...(reason ? { error: reason } : {}) });
       return { status, ...(reason ? { error: reason } : {}), usage };
     }
     const reportPath = PHASE_OUTPUT.report;
     const hasReport = await exists(ws.path(reportPath));
-    safeEmit({ type: "done", status: "succeeded", ...(hasReport ? { reportPath } : {}) });
+    safeEmit({
+      type: "done",
+      status: "succeeded",
+      ...(hasReport ? { reportPath } : {}),
+    });
     return { status: "succeeded", ...(hasReport ? { reportPath } : {}), usage };
   } catch (cause: unknown) {
     const cancelled =
-      cause instanceof CancelledError || (options.signal.aborted && !budget.signal.aborted);
+      cause instanceof CancelledError ||
+      (options.signal.aborted && !budget.signal.aborted);
     const message = redactor.redact(
-      budget.signal.aborted ? errorMessage(budget.signal.reason) : errorMessage(cause),
+      budget.signal.aborted
+        ? errorMessage(budget.signal.reason)
+        : errorMessage(cause),
     );
-    safeEmit({ type: "phase", phase: currentPhase, status: "failed", summary: message });
+    safeEmit({
+      type: "phase",
+      phase: currentPhase,
+      status: "failed",
+      summary: message,
+    });
     const status = cancelled ? "cancelled" : "failed";
     safeEmit({ type: "done", status, error: message });
     return { status, error: message, usage };

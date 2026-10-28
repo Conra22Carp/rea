@@ -1,4 +1,8 @@
-import { runJob, type ApprovalGate, type RunJobResult } from "@rea-studio/agent";
+import {
+  runJob,
+  type ApprovalGate,
+  type RunJobResult,
+} from "@rea-studio/agent";
 import type { JobRecord, ModelConfig, StudioStore } from "@rea-studio/core";
 import type { LanguageModel } from "ai";
 
@@ -86,7 +90,16 @@ export const processJob = async (
     const result = await runJob({
       spec: job.spec,
       secrets: store.getJobSecrets(job.id),
-      models: { analysis, build },
+      models: {
+        analysis: {
+          ...analysis,
+          ...(job.pricing?.analysis ? { pricing: job.pricing.analysis } : {}),
+        },
+        build: {
+          ...build,
+          ...(job.pricing?.build ? { pricing: job.pricing.build } : {}),
+        },
+      },
       workspaceRoot: job.workspace,
       emit: (event) => store.appendEvent(job.id, event),
       approvals: databaseGate(store, job.id, signal),
@@ -99,7 +112,11 @@ export const processJob = async (
     return result;
   } catch (cause: unknown) {
     const message = cause instanceof Error ? cause.message : String(cause);
-    store.appendEvent(job.id, { type: "done", status: "failed", error: message });
+    store.appendEvent(job.id, {
+      type: "done",
+      status: "failed",
+      error: message,
+    });
     store.setJobStatus(job.id, "failed", message);
     return {
       status: "failed",

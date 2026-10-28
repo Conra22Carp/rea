@@ -24,6 +24,7 @@ const httpUrl = z
 export const jobSpecSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
+    language: z.enum(["es", "en"]).optional(),
     target: z.object({
       kind: z.enum(ids(TARGET_KINDS)),
       url: httpUrl.optional(),
@@ -61,6 +62,7 @@ export const jobSpecSchema = z
     budget: z.object({
       maxStepsPerPhase: z.number().int().min(5).max(500).default(60),
       maxTotalTokens: z.number().int().min(10_000).optional(),
+      maxCostUsd: z.number().positive().max(10000).optional(),
     }),
     approvals: z.object({
       destructiveTools: z.enum(["ask", "auto"]).default("ask"),
