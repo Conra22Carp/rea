@@ -2851,3 +2851,48 @@ progress {
     margin-left: 0;
   }
 }
+
+.permission-choice {
+  border: 0;
+  padding: 0;
+  margin: 12px 0;
+  min-width: 0;
+}
+.permission-choice legend {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.permission-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  margin-top: 12px;
+  cursor: pointer;
+}
+.permission-option.selected {
+  border-color: var(--ink);
+  background: var(--paper);
+}
+.permission-option:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.permission-option input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.permission-option strong {
+  display: block;
+  font-size: 13px;
+}
+.permission-option small {
+  display: block;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 6px;
+}

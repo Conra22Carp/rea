@@ -52,10 +52,15 @@ Al actualizar el código, reinicialo para recargar también el worker.
    `input/`, `evidence/`, `notes/`, `spec/`, `output/` y `logs/` dentro de su ID;
    el código generado queda en **`<carpeta>/<proyecto>-<id>/<ejecución>/output/`**.
 4. En **Nueva ejecución**, definí objetivo, acceso, alcance, mejoras y presupuesto.
+   En Revisar, elegí **Autorizar toda la ejecución** para permitir comandos y
+   herramientas durante todas las fases sin nuevas aprobaciones, o **Aprobar
+   paso por paso** para decidir antes de cada comando y herramienta destructiva.
+   La autorización completa incluye avanzar sin revisión de especificación;
+   se aplica solo a esa ejecución. No hay una opción preseleccionada.
    El modelo elegido se conserva. Podés seleccionar explícitamente otro modelo
    guardado para especificación, construcción, verificación e informe.
 5. Revisá la especificación y aprobá o solicitá cambios. Seguí las cinco fases,
-   aprobaciones y eventos en vivo. Explorá archivos, comparalos con la ejecución
+   aprobaciones y eventos en vivo, con los más recientes primero. Explorá archivos, comparalos con la ejecución
    anterior y descargá el ZIP y el informe `output/REPORT.md`.
 6. **Consumo** muestra tokens, costo estimado, actividad de los últimos 14 días
    en UTC, ejecuciones recientes y estado del worker. Podés filtrar por proyecto
@@ -205,7 +210,9 @@ mode with the same worker and state.
 
 Save provider credentials in **Settings**, create a project, select a model
 and output folder, and start a run. The wizard covers target, access, scope,
-improvements, and review. Review the specification, approve actions, inspect
+improvements, and review. Explicitly choose full authorization for that run
+(commands, tools, and specification progression) or step-by-step approval.
+Activity shows the newest events first. Review the specification, approve actions, inspect
 files and diffs, and download the report and ZIP. Your selected model persists;
 changing the build model requires an explicit selection.
 

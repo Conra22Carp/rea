@@ -77,10 +77,7 @@ export function JobWizard({
   const [maxSteps, setMaxSteps] = useState(settings.maxStepsPerPhase);
   const [maxCost, setMaxCost] = useState("");
   const [specReview, setSpecReview] = useState(settings.specReview);
-  const [commands, setCommands] = useState<"ask" | "auto">("ask");
-  const [destructiveTools, setDestructiveTools] = useState<"ask" | "auto">(
-    "ask",
-  );
+  const [permissionMode, setPermissionMode] = useState<"ask" | "auto" | "">("");
   const [authorized, setAuthorized] = useState(false);
   const [buildModel, setBuildModel] = useState(project.modelId);
   const [busy, setBusy] = useState(false);
@@ -109,6 +106,15 @@ export function JobWizard({
       setStep(step + 1);
       return;
     }
+    if (!permissionMode) {
+      setError(
+        t(
+          "Elegí cómo autorizar esta ejecución.",
+          "Choose how to authorize this run.",
+        ),
+      );
+      return;
+    }
     setBusy(true);
     try {
       const spec = {
@@ -134,7 +140,11 @@ export function JobWizard({
           maxTotalTokens: tokens,
           ...(maxCost ? { maxCostUsd: Number(maxCost) } : {}),
         },
-        approvals: { destructiveTools, commands, specReview },
+        approvals: {
+          destructiveTools: permissionMode,
+          commands: permissionMode,
+          specReview: permissionMode === "auto" ? false : specReview,
+        },
         authorizationAttested: authorized,
       };
       const form = new FormData();
@@ -707,12 +717,7 @@ export function JobWizard({
                 />
               </Field>
               <details>
-                <summary>
-                  {t(
-                    "Modelo de construcción y permisos",
-                    "Build model and permissions",
-                  )}
-                </summary>
+                <summary>{t("Modelo de construcción", "Build model")}</summary>
                 <div className="form-stack">
                   <Field
                     label={t("Modelo para construir", "Model for building")}
@@ -736,68 +741,81 @@ export function JobWizard({
                       ))}
                     </Select>
                   </Field>
-                  <Field
-                    label={t("Ejecución de comandos", "Command execution")}
-                    htmlFor="command-policy"
-                  >
-                    <Select
-                      id="command-policy"
-                      value={commands}
-                      onChange={(event) =>
-                        setCommands(event.target.value as "ask" | "auto")
-                      }
-                    >
-                      <option value="ask">
-                        {t("Solicitar aprobación", "Ask for approval")}
-                      </option>
-                      <option value="auto">
-                        {t("Permitir automáticamente", "Allow automatically")}
-                      </option>
-                    </Select>
-                  </Field>
-                  <Field
-                    label={t(
-                      "Herramientas con efectos destructivos",
-                      "Tools with destructive effects",
-                    )}
-                    htmlFor="destructive-policy"
-                  >
-                    <Select
-                      id="destructive-policy"
-                      value={destructiveTools}
-                      onChange={(event) =>
-                        setDestructiveTools(
-                          event.target.value as "ask" | "auto",
-                        )
-                      }
-                    >
-                      <option value="ask">
-                        {t("Solicitar aprobación", "Ask for approval")}
-                      </option>
-                      <option value="auto">
-                        {t("Permitir automáticamente", "Allow automatically")}
-                      </option>
-                    </Select>
-                  </Field>
-                  <p className="field-hint">
-                    {t(
-                      "Los comandos se ejecutan en esta máquina con los permisos del usuario. El modo local no es un sandbox.",
-                      "Commands run on this machine with your user's permissions. Local mode is not a sandbox.",
-                    )}
-                  </p>
                 </div>
               </details>
-              <label className="check-row">
-                <input
-                  type="checkbox"
-                  checked={specReview}
-                  onChange={(event) => setSpecReview(event.target.checked)}
-                />
-                {t(
-                  "Quiero revisar la especificación antes de construir",
-                  "I want to review the specification before building",
-                )}
-              </label>
+              <fieldset className="permission-choice">
+                <legend>
+                  {t("Permisos de esta ejecución", "Permissions for this run")}
+                </legend>
+                <p className="field-hint">
+                  {t(
+                    "Elegí cómo querés que Reall ejecute el trabajo.",
+                    "Choose how Reall should carry out this run.",
+                  )}
+                </p>
+                <label
+                  className={`permission-option ${permissionMode === "auto" ? "selected" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="permission-mode"
+                    value="auto"
+                    required
+                    checked={permissionMode === "auto"}
+                    onChange={() => setPermissionMode("auto")}
+                  />
+                  <span>
+                    <strong>
+                      {t(
+                        "Autorizar toda la ejecución",
+                        "Authorize the entire run",
+                      )}
+                    </strong>
+                    <small>
+                      {t(
+                        "Doy permiso para ejecutar comandos y herramientas, instalar dependencias y modificar o eliminar archivos sin pedirme aprobación en cada paso. Incluye todas las fases de esta ejecución, con los permisos de mi usuario en esta máquina.",
+                        "I allow commands and tools, dependency installation, and file changes or deletion without approval at each step. This covers all phases of this run, using my user's permissions on this machine.",
+                      )}
+                    </small>
+                  </span>
+                </label>
+                <label
+                  className={`permission-option ${permissionMode === "ask" ? "selected" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="permission-mode"
+                    value="ask"
+                    required
+                    checked={permissionMode === "ask"}
+                    onChange={() => setPermissionMode("ask")}
+                  />
+                  <span>
+                    <strong>
+                      {t("Aprobar paso por paso", "Approve step by step")}
+                    </strong>
+                    <small>
+                      {t(
+                        "Reall me pedirá aprobación antes de cada comando y herramienta con efectos destructivos. Las lecturas y la generación de archivos del proyecto continúan automáticamente.",
+                        "Reall will ask before each command and tool with destructive effects. Reading and generating project files continue automatically.",
+                      )}
+                    </small>
+                  </span>
+                </label>
+              </fieldset>
+              {permissionMode !== "auto" && (
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={specReview}
+                    onChange={(event) => setSpecReview(event.target.checked)}
+                  />
+                  {t(
+                    "Quiero revisar la especificación antes de construir",
+                    "I want to review the specification before building",
+                  )}
+                </label>
+              )}
               <label className="check-row authorization">
                 <input
                   type="checkbox"

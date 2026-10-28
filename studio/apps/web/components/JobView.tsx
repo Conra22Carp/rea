@@ -64,6 +64,7 @@ export function JobView({
   const { t, locale } = useLocale();
   const [job, setJob] = useState(initial);
   const [events, setEvents] = useState<StoredEvent[]>([]);
+  const newestEvents = events.slice().reverse();
   const [approvals, setApprovals] = useState(initialApprovals);
   const [connected, setConnected] = useState(false);
   const [tab, setTab] = useState("activity");
@@ -395,7 +396,7 @@ export function JobView({
             </EmptyState>
           ) : (
             <div className="timeline">
-              {events.map(({ seq, ts, event }) => (
+              {newestEvents.map(({ seq, ts, event }) => (
                 <div key={seq} className={`timeline-item event-${event.type}`}>
                   <span className="timeline-dot">
                     {event.type === "tool-call" ? (
