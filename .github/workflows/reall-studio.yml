@@ -1,0 +1,55 @@
+name: Reall Studio
+
+# Checks for the fork's own application in studio/. The workflows inherited
+# from REA do not build or test it.
+on:
+  push:
+    branches: [main]
+    paths: ["studio/**", ".github/workflows/reall-studio.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["studio/**", ".github/workflows/reall-studio.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reall-studio-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  studio:
+    # Only the Reall fork runs this; upstream and other forks skip it.
+    if: github.repository == 'Conra22Carp/reall'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      HUSKY: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install npm from packageManager
+        run: npm install -g "$(node -p "require('./package.json').packageManager")"
+      - name: Install and build the REA engine
+        run: |
+          npm ci
+          npm run build:cached
+      - name: Install Studio
+        working-directory: studio
+        run: npm ci
+      - name: Typecheck
+        working-directory: studio
+        run: npm run typecheck
+      - name: Test (includes real REA with a scripted model)
+        working-directory: studio
+        run: npm test
+      - name: Build
+        working-directory: studio
+        run: npm run build
+      - name: Smoke test (pages, session guard, single worker)
+        working-directory: studio
+        run: npm run smoke
