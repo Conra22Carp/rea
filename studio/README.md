@@ -21,28 +21,36 @@ proyectos, la interfaz y el seguimiento del consumo. El motor de upstream en
 ## Inicio local
 
 Usá **Node 24.22.1 y npm 11.16.0**, según `.nvmrc` y `packageManager` de la raíz.
-Desde el checkout del repositorio:
+Desde un clon del repositorio:
 
 ```sh
-npm ci
-npm run build:cached
 cd studio
-npm ci
+npm run setup
 npm run studio
 ```
 
+`npm run setup` instala y compila el motor REA en la raíz y después Studio
+(equivale a `npm ci && npm run build:cached` en la raíz y `npm ci && npm run build`
+en `studio/`). Con `npm run setup -- --studio-only` se omite el motor si ya tenés REA instalado.
+
 Abrí **http://127.0.0.1:4317**. El launcher compila los paquetes y la interfaz,
-genera una sesión local y arranca web + worker. Para desarrollo con recarga:
+genera una sesión local y arranca web + worker. La versión y el commit en uso
+aparecen al pie de la interfaz. Para desarrollo con recarga:
 
 ```sh
 npm run dev
 ```
 
-Ambos comandos usan el mismo estado. No arranques dos workers sobre la misma
-base de datos. El launcher debe permanecer abierto mientras haya ejecuciones.
+Ambos comandos usan el mismo estado. Solo un worker puede usar cada carpeta de
+estado (`STUDIO_HOME`): un segundo se niega a arrancar y no toca las ejecuciones
+del primero. El launcher debe permanecer abierto mientras haya ejecuciones.
 Al actualizar el código, reinicialo para recargar también el worker.
 
 ## Tu primer proyecto
+
+¿Primera vez? Usá **Probar con un ejemplo** en Inicio o en Proyectos: crea un
+proyecto con [una app de notas de ejemplo](examples/notas/README.md), sin datos
+reales, y abre la ejecución precargada con los resultados que deberías ver.
 
 1. En **Configuración → Conexiones**, guardá la API key del proveedor. Para
    Ollama o un servidor local sin autenticación, dejá la clave vacía.
@@ -61,18 +69,32 @@ Al actualizar el código, reinicialo para recargar también el worker.
    herramientas durante todas las fases sin nuevas aprobaciones, o **Aprobar
    paso por paso** para decidir antes de cada comando y herramienta destructiva.
    La autorización completa incluye avanzar sin revisión de especificación;
-   se aplica solo a esa ejecución. No hay una opción preseleccionada.
+   se aplica solo a esa ejecución. No hay una opción preseleccionada. El modo
+   elegido queda visible en la ejecución.
+   Antes de iniciar, el **chequeo previo** revisa sin gastar tokens Node, REA, el
+   navegador (web), Java y JADX (Android), el worker, la carpeta y las credenciales
+   del modelo; si falta algo requerido, no deja iniciar.
    El modelo elegido se conserva. Podés seleccionar explícitamente otro modelo
    guardado para especificación, construcción, verificación e informe.
 5. Si elegiste revisar la especificación, aprobala o solicitá cambios. Seguí
    las cinco fases, aprobaciones y eventos en vivo, con los más recientes primero.
    Explorá archivos, comparalos con la ejecución anterior y descargá el ZIP y
-   el informe `output/REPORT.md`. Un estado «Completado» indica que terminó el
-   flujo; no garantiza que todas las pruebas hayan pasado.
+   el informe `output/REPORT.md`. «Terminado» indica que terminó el flujo.
+   **Verificado** aparece solo si en la fase de verificación Reall ejecutó checks
+   (build, tests) con `run_check`, registró su código de salida en
+   `logs/checks.json` (donde el modelo no puede escribir) y todos pasaron. La pestaña
+   **Qué aprendimos** muestra las afirmaciones de `output/findings.json` como
+   observadas, inferidas o desconocidas, con enlaces a la evidencia y a sus checks.
+   **Qué cambió** resume los archivos escritos y los comandos ejecutados.
+   **Repetir** abre una ejecución nueva con las mismas opciones (sin credenciales
+   ni permisos), y **Avisarme** activa avisos del navegador cuando pide revisión o termina.
 6. **Consumo** muestra tokens, costo estimado, actividad de los últimos 14 días
    en UTC, ejecuciones recientes y estado del worker. Podés filtrar por proyecto
    o consultar el total. Se actualiza por SSE,
    después de cada llamada completada al modelo. No contiene datos de ejemplo.
+
+Las ejecuciones terminadas y los proyectos sin ejecuciones activas se pueden
+quitar del historial; sus carpetas quedan en el disco.
 
 Si necesitás agregar una conexión mientras creás un proyecto, entrá a
 Configuración desde el formulario y volvé con **Continuar con mi proyecto**.
@@ -90,8 +112,8 @@ La lista predeterminada incluye GPT-5, GPT-5 mini, GPT-4.1, Claude Sonnet 4.5,
 Gemini 2.5 Pro/Flash y Qwen3 Coder local. No se cambia de modelo automáticamente.
 
 El catálogo en [`packages/core/src/pricing.ts`](packages/core/src/pricing.ts)
-contiene referencias de precios consultadas el 27/10/2026, con enlaces a sus
-fuentes. Las tarifas se guardan junto con cada ejecución para que futuros
+contiene referencias de precios con enlaces a sus fuentes. Cada tarifa muestra
+cuándo se consultó y se marca como posiblemente desactualizada después de 30 días. Las tarifas se guardan junto con cada ejecución para que futuros
 cambios no alteren su cálculo. Se consideran tokens en caché y el nivel de
 contexto largo de Gemini cuando el proveedor informa esos datos.
 
@@ -187,7 +209,13 @@ cd studio
 npm run typecheck
 npm test
 npm run build
+npm run smoke
 ```
+
+`npm run smoke` arranca la app compilada con un estado temporal y comprueba por
+HTTP las páginas, la sesión local, el ejemplo y que un segundo worker sea rechazado.
+El workflow [`reall-studio.yml`](../.github/workflows/reall-studio.yml) corre todo
+esto en Linux en cada push o PR que toque `studio/`, cuando Actions está habilitado en el repositorio.
 
 Las pruebas incluyen cifrado, migración de datos anteriores, carpetas de
 proyectos, presupuestos, tarifas/caché y un flujo con REA real y modelo simulado.
@@ -208,8 +236,8 @@ Reall is a local, single-user application for analyzing, rebuilding, and
 improving apps with REA and your chosen model. Built by
 [Artesia by Conra](https://artesia.ar), independently of upstream REA.
 
-Use Node 24.22.1 / npm 11.16.0. From the repository root, run `npm ci` and
-`npm run build:cached`; then run `npm ci` and `npm run studio` inside `studio/`.
+Use Node 24.22.1 / npm 11.16.0. Run `npm run setup` and then `npm run studio`
+inside `studio/`; setup installs and builds the REA engine and Studio.
 Open **http://127.0.0.1:4317** and select **EN**. `npm run dev` starts development
 mode with the same worker and state.
 
@@ -219,7 +247,10 @@ improvements, and review. Explicitly choose full authorization for that run
 (commands, tools, and specification progression) or step-by-step approval.
 Activity shows the newest events first. Review the specification and approve
 actions when your chosen policy requires it. Inspect files and diffs, and
-download the report and ZIP. A completed run does not certify that all tests passed. Your selected model persists;
+download the report and ZIP. "Finished" is not "Verified": a run is verified only
+when checks Reall ran itself during verification all passed. "What we learned"
+links each claim to its evidence; "Run again", alerts, the pre-run check and the
+guided example ("Try an example") are part of v1. Your selected model persists;
 changing the build model requires an explicit selection.
 
 Model cards show exact IDs, context windows, and input/output prices. Use the

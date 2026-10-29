@@ -2,9 +2,9 @@
 
 **Una forma más accesible de explorar cómo funciona una aplicación y trabajar sobre sus posibilidades.**
 
-[Guía breve](docs/reall/guia.md) · [Instalación](studio/README.md#inicio-local) · [Próximos pasos](#próximos-pasos) · [English](#english)
+[Guía breve](docs/reall/guia.md) · [Instalación](studio/README.md#inicio-local) · [Novedades de la v1](#novedades-de-la-v1) · [Cambios](studio/CHANGELOG.md) · [English](#english)
 
-> **Estado: v0.** Primera versión pública; la voy a seguir iterando.
+> **Estado: v1.0.0.** Primera versión estable de la capa Reall; sigue en desarrollo y se itera en público.
 
 Reall es un **fork independiente de [REA — Reverse Engineer Anything](https://github.com/morluto/rea)**,
 creado por **[Artesia by Conra](https://artesia.ar)**. REA aporta el motor de
@@ -19,16 +19,18 @@ que cualquier resultado generado por IA sea correcto o esté completamente expli
 
 ## Qué aporta este fork
 
-| Aporte de Reall                       | Para qué sirve                                                                                         |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Interfaz web en español e inglés      | Usar el flujo desde el navegador, con una presentación simple en blanco, negro y grises.               |
-| Proyectos y ejecuciones guiadas       | Separar el objetivo, el acceso, el alcance, las mejoras y la revisión.                                 |
-| Conexiones a modelos en Configuración | Guardar las API keys y elegir qué modelo usar, sin cambiarlo automáticamente.                          |
-| Catálogo de modelos y precios         | Comparar tarifas y estimar el costo de una llamada antes de comenzar.                                  |
-| Elección de carpeta                   | Decidir dónde guardar los archivos generados y descargarlos como ZIP.                                  |
-| Permisos por ejecución                | Elegir entre autorizar toda la ejecución o aprobar comandos y herramientas destructivas paso por paso. |
-| Actividad y consumo en vivo           | Ver primero lo más reciente y seguir los tokens y costos estimados por proyecto.                       |
-| Archivos, diferencias e informe       | Revisar lo generado, las evidencias guardadas y lo que todavía necesita validación.                    |
+| Aporte de Reall                       | Para qué sirve                                                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Interfaz web en español e inglés      | Usar el flujo desde el navegador, con una presentación simple en blanco, negro y grises.                       |
+| Proyectos y ejecuciones guiadas       | Separar el objetivo, el acceso, el alcance, las mejoras y la revisión. Repetir una ejecución con sus opciones. |
+| Conexiones a modelos en Configuración | Guardar las API keys y elegir qué modelo usar, sin cambiarlo automáticamente.                                  |
+| Catálogo de modelos y precios         | Comparar tarifas, ver cuándo se consultó cada una y estimar el costo de una llamada antes de comenzar.         |
+| Chequeo previo                        | Saber antes de gastar tokens si falta un navegador, Java, el worker, permisos de carpeta o credenciales.       |
+| Permisos por ejecución                | Elegir entre autorización completa o aprobación paso por paso, y verlo durante toda la ejecución.              |
+| Verificación real                     | «Verificado» solo cuando Reall ejecutó checks (build, tests) y todos pasaron; si no, se dice que falta.        |
+| Qué aprendimos                        | Cada afirmación separada en observada, inferida o desconocida, con un clic a su evidencia y a su check.        |
+| Actividad, consumo y avisos           | Ver primero lo más reciente, seguir tokens y costos, y recibir un aviso cuando pide revisión o termina.        |
+| Archivos, cambios e informe           | Revisar lo generado, qué archivos y comandos cambiaron, y descargar todo como ZIP.                             |
 
 REA sigue siendo el responsable de las capacidades de ingeniería inversa. Este
 fork añade una aplicación en [`studio/`](studio/README.md) y un agente que usa
@@ -38,39 +40,33 @@ esas herramientas con el modelo que elijas. Los archivos del motor heredado en
 ## Cómo se usa
 
 1. **Configurá una conexión.** Cargá tu API key o conectá un modelo local compatible.
-2. **Creá un proyecto.** Elegí el modelo y la carpeta donde querés guardar el código.
-3. **Definí una ejecución.** Indicá qué aplicación o función querés analizar y qué querés mejorar.
-4. **Elegí los permisos.** Autorización completa para esa ejecución, o aprobación paso por paso.
+2. **Creá un proyecto**, o probá primero con el **ejemplo guiado** (una app de notas sin datos reales).
+3. **Definí una ejecución.** Indicá qué aplicación o función querés analizar y qué querés mejorar o migrar.
+4. **Elegí los permisos** y mirá el **chequeo previo** antes de iniciar.
 5. **Seguí el proceso.** Análisis → especificación → construcción → verificación → informe.
-6. **Revisá el resultado.** Consultá archivos, evidencias, pruebas y pendientes antes de usar el código.
+6. **Revisá el resultado.** Verificación, «Qué aprendimos», cambios, archivos e informe.
 
-Por ejemplo: entender cómo funciona la búsqueda de una aplicación propia,
-documentar su comportamiento y pedir una implementación mejorada con pruebas.
 Conviene empezar por una función acotada, con un objetivo que puedas verificar.
 
 ## Primeros pasos
 
-Hoy Reall se instala desde el código fuente. La interfaz reduce la complejidad
-del uso cotidiano, pero la instalación todavía requiere terminal y dependencias.
-Necesitás Git, **Node 24.22.1** y **npm 11.16.0**.
+Reall se instala desde el código fuente con un comando. Necesitás Git,
+**Node 24.22.1** y **npm 11.16.0** (ver `.nvmrc`).
 
 ```sh
 git clone https://github.com/Conra22Carp/reall.git
-cd reall
-npm ci
-npm run build:cached
-cd studio
-npm ci
+cd reall/studio
+npm run setup
 npm run studio
 ```
 
-Abrí **http://127.0.0.1:4317** en la misma computadora donde ejecutaste el comando.
-Mantené esa terminal abierta. Si lo ejecutás en un servidor remoto, su dirección
-local y sus carpetas pertenecen a ese servidor.
+`npm run setup` instala y compila el motor REA y la aplicación. Abrí
+**http://127.0.0.1:4317** en la misma computadora y mantené la terminal abierta.
+Si lo ejecutás en un servidor remoto, su dirección local y sus carpetas pertenecen
+a ese servidor. La versión y el commit en uso aparecen al pie de la interfaz.
 
-Para actualizar una instalación existente, detené Reall, ejecutá `git pull --ff-only`
-desde la raíz y repetí los comandos desde `npm ci`. Si Git informa cambios locales,
-revisalos antes de continuar; no hace falta borrar tus proyectos.
+Para actualizar, detené Reall, ejecutá `git pull --ff-only` y repetí `npm run setup`.
+No hace falta borrar tus proyectos.
 
 La [guía de instalación de Reall](studio/README.md) detalla desarrollo, Docker,
 credenciales y dependencias: un navegador para objetivos web, Java/JADX para
@@ -79,60 +75,62 @@ Android y un proveedor compatible para binarios nativos. El comando upstream
 
 ## Qué significa que sea «explainable»
 
-La experiencia busca responder cuatro preguntas:
-
-- **¿Qué está haciendo?** Fases y actividad de la ejecución.
-- **¿En qué se basa?** Resultados de REA guardados como evidencia y referencias en los informes.
-- **¿Qué puedo decidir?** Objetivo, modelo, carpeta, presupuesto y permisos.
-- **¿Qué falta comprobar?** Resultados de verificación, límites y desconocidos del informe.
-
-Hoy la evidencia se puede explorar como archivos y los informes se generan con
-IA. Falta convertir esa información en explicaciones breves, enlazadas y fáciles
-de evaluar. Esa es una de las [próximas prioridades](#próximos-pasos).
+- **¿Qué está haciendo?** Fases, actividad y permisos visibles de la ejecución.
+- **¿En qué se basa?** Evidencia de REA guardada y enlazada desde cada afirmación.
+- **¿Qué puedo decidir?** Objetivo, modelo, carpeta, presupuesto, mejoras y permisos.
+- **¿Qué falta comprobar?** Checks que fallaron o no se ejecutaron, inferencias y desconocidos.
 
 ## Estado y límites actuales
 
-Reall es una aplicación local para un usuario. **«Completado» indica que terminó
-el flujo; no certifica que el software generado funcione ni que todas sus pruebas
-hayan pasado.** Revisá `output/REPORT.md`, `spec/verification.md` y el proyecto generado.
+Reall es una aplicación local para un usuario. **«Terminado» indica que terminó
+el flujo; «Verificado» solo aparece cuando Reall ejecutó checks y todos pasaron.**
+Un check que pasa prueba ese comando, no que el software esté completo: revisá
+el informe, «Qué aprendimos» y el proyecto generado.
 
-Las API keys se cifran localmente. Al usar una API remota, el contexto necesario
-para las llamadas se envía al proveedor elegido: «local» no significa que todo
-el procesamiento ocurra sin conexión.
+Las API keys y las credenciales del objetivo se cifran localmente. Al usar una
+API remota, el contexto necesario para las llamadas se envía al proveedor elegido:
+«local» no significa que todo el procesamiento ocurra sin conexión.
 
-Los costos son estimaciones, actualizadas después de cada llamada completada.
-El presupuesto se controla al finalizar la llamada, por lo que la última puede
-superarlo. Las pruebas de conexión pueden tener costo y no se suman al consumo
-de las ejecuciones. Los comandos autorizados usan los permisos de tu usuario;
-la aplicación no es un entorno aislado de ejecución.
+Los costos son estimaciones, actualizadas después de cada llamada completada; la
+última llamada puede superar el presupuesto. Los comandos autorizados usan los
+permisos de tu usuario: la aplicación no es un entorno aislado. Usá aplicaciones
+propias o para las que tengas autorización.
 
-Usá aplicaciones propias o para las que tengas autorización. La reconstrucción
-puede ser parcial; las capacidades dependen del objetivo, el modelo y las
-herramientas instaladas.
+## Novedades de la v1
 
-## Próximos pasos
+Pendientes de la v0, resueltos:
 
-1. Separar «ejecución terminada» de «resultado verificado», mostrando qué pruebas pasaron, fallaron o no se ejecutaron ([#1](https://github.com/Conra22Carp/reall/issues/1)).
-2. CI propia para `studio/` ([#2](https://github.com/Conra22Carp/reall/issues/2)) y protección contra dos instancias sobre los mismos datos ([#3](https://github.com/Conra22Carp/reall/issues/3)).
-3. Un primer proyecto guiado con un ejemplo propio, sin datos reales ([#4](https://github.com/Conra22Carp/reall/issues/4)).
-4. Chequeo de dependencias antes de gastar tokens y versión visible en la interfaz ([#5](https://github.com/Conra22Carp/reall/issues/5)).
-5. Una vista «Qué aprendimos» que enlace cada afirmación con su evidencia ([#6](https://github.com/Conra22Carp/reall/issues/6)).
-6. Instalación más simple, probada en máquinas limpias ([#7](https://github.com/Conra22Carp/reall/issues/7)).
-7. Permisos elegidos visibles durante toda la ejecución ([#8](https://github.com/Conra22Carp/reall/issues/8)).
-8. Consumo que no se recalcule por cada pestaña conectada ([#9](https://github.com/Conra22Carp/reall/issues/9)).
-9. Errores del backend traducidos al idioma de la interfaz ([#10](https://github.com/Conra22Carp/reall/issues/10)).
+1. Separar «terminado» de «verificado» con checks que Reall ejecuta y registra ([#1](https://github.com/Conra22Carp/reall/issues/1)).
+2. Una sola instancia de worker por carpeta de estado ([#3](https://github.com/Conra22Carp/reall/issues/3)).
+3. Proyecto de ejemplo guiado, sin datos reales ([#4](https://github.com/Conra22Carp/reall/issues/4)).
+4. Chequeo previo antes de gastar tokens y versión visible ([#5](https://github.com/Conra22Carp/reall/issues/5)).
+5. Vista «Qué aprendimos» con evidencia enlazada ([#6](https://github.com/Conra22Carp/reall/issues/6)).
+6. Permisos visibles durante toda la ejecución y resumen de cambios ([#8](https://github.com/Conra22Carp/reall/issues/8)).
+7. Consumo compartido entre pestañas: 10× menos trabajo con 10 pestañas abiertas ([#9](https://github.com/Conra22Carp/reall/issues/9)).
+8. Errores del backend en el idioma de la interfaz ([#10](https://github.com/Conra22Carp/reall/issues/10)).
+9. Instalación con un comando ([#7](https://github.com/Conra22Carp/reall/issues/7)) y CI propia para `studio/` ([#2](https://github.com/Conra22Carp/reall/issues/2)); quedan pasos abiertos, ver los issues.
 
-Cada punto se discute en los [issues](https://github.com/Conra22Carp/reall/issues). Todo feedback es bienvenido.
+Cinco mejoras nuevas:
+
+10. Campos numéricos que no quedan con un 0 delante al borrarlos ([#11](https://github.com/Conra22Carp/reall/issues/11)).
+11. «Repetir» una ejecución con sus mismas opciones ([#12](https://github.com/Conra22Carp/reall/issues/12)).
+12. Fecha de cada tarifa de referencia y aviso cuando tiene más de 30 días ([#13](https://github.com/Conra22Carp/reall/issues/13)).
+13. Avisos cuando una ejecución pide revisión o termina ([#14](https://github.com/Conra22Carp/reall/issues/14)).
+14. Quitar ejecuciones y proyectos del historial sin borrar archivos ([#15](https://github.com/Conra22Carp/reall/issues/15)).
+
+El detalle está en el [registro de cambios](studio/CHANGELOG.md). Cada punto se discute en los
+[issues](https://github.com/Conra22Carp/reall/issues). Todo feedback es bienvenido.
 
 ## Documentación de Reall
 
 - [Guía para empezar y entender los resultados](docs/reall/guia.md).
 - [Instalación y referencia técnica](studio/README.md).
+- [Registro de cambios](studio/CHANGELOG.md).
 
 ## Autoría y licencia
 
 El motor REA fue creado por [morluto y sus colaboradores](https://github.com/morluto/rea).
-Este fork y la capa Reall son el trabajo de **Conra / [Artesia by Conra](https://artesia.ar)**.
+Este fork y la capa Reall son el trabajo de **[Artesia by Conra](https://artesia.ar)**.
 No es una distribución oficial de REA ni implica afiliación o respaldo del proyecto original.
 
 Se conserva la [licencia MIT](LICENSE) y la atribución del proyecto original.
@@ -142,19 +140,21 @@ referencia heredada de abajo corresponden a upstream, no a resultados de Reall.
 ## English
 
 **Reall is an independent fork of [REA](https://github.com/morluto/rea), built by
-Conra / [Artesia by Conra](https://artesia.ar).** REA provides the analysis engine;
-my work adds a local web interface, guided projects, model connections and
-pricing, output folders, per-run permissions, live usage, and access to evidence
-and generated reports.
+[Artesia by Conra](https://artesia.ar).** REA provides the analysis engine; my work
+adds a local web interface, guided projects, model connections and pricing, output
+folders, per-run permissions, live usage, and access to evidence and reports.
+
+**v1.0.0** adds real verification (a run is "Verified" only when checks Reall ran
+itself all passed), a "What we learned" view that links each claim to its evidence,
+a pre-run check, a guided example project, one-command install (`cd studio && npm run setup`),
+a single-worker lock, "Run again", rate freshness, alerts, history cleanup and
+translated errors. See the [changelog](studio/CHANGELOG.md).
 
 The goal is to make REA's capabilities more approachable and explainable for
-people with less technical experience. This is a v0 and will keep iterating: installation
-still requires a terminal, and generated results need human review. A completed
-run does not certify a successful reconstruction. Remote model APIs receive the
-context required for their calls; local operation does not mean fully offline.
-
-Follow the source installation commands above and select **EN** in the app.
-See the [English setup and limitations](studio/README.md#english-quick-start).
+people with less technical experience. Generated results still need human review;
+remote model APIs receive the context required for their calls. Follow the
+installation above, select **EN** in the app, and see the
+[English setup and limitations](studio/README.md#english-quick-start).
 Reall preserves REA's MIT license and attribution and is not an official REA release.
 
 ---

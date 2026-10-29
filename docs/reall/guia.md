@@ -10,6 +10,10 @@ seguí la [guía de instalación](../../studio/README.md#inicio-local).
 
 ## Una primera tarea útil
 
+La forma más rápida de empezar es **Probar con un ejemplo** (en Inicio o Proyectos):
+crea un proyecto con una app de notas de ejemplo, sin datos reales, y abre la
+ejecución precargada con los resultados que deberías ver al final.
+
 Elegí una aplicación tuya y una función concreta. Por ejemplo:
 
 > Quiero entender cómo funciona la búsqueda de mi aplicación de notas.
@@ -30,15 +34,19 @@ reales de clientes.
    no el precio cerrado del proyecto.
 3. **Nueva ejecución:** indicá el objetivo, el acceso, qué parte querés estudiar
    y qué mejora esperás. Un proyecto puede tener varias ejecuciones.
-4. **Permisos:** elegí autorizar toda esa ejecución o aprobar los comandos y
-   herramientas destructivas paso por paso. La autorización completa también
-   permite avanzar de la especificación a la construcción sin revisión.
+4. **Permisos y chequeo previo:** elegí autorizar toda esa ejecución o aprobar los
+   comandos y herramientas destructivas paso por paso. La autorización completa
+   también permite avanzar de la especificación a la construcción sin revisión.
+   Antes de iniciar, el chequeo previo avisa si falta algo en tu máquina (por
+   ejemplo, un navegador para una web app) sin gastar tokens.
 5. **Actividad:** seguí las fases. La información más nueva aparece primero.
    En el modo con revisión, leé la especificación y aprobala o pedí cambios.
 6. **Consumo:** mirá tokens y costos estimados del proyecto. Se actualizan
    después de cada llamada al modelo, no durante cada palabra generada.
-7. **Archivos e informe:** explorá los resultados y descargá el ZIP. El código
-   queda en la subcarpeta `output/` de la ejecución.
+7. **Verificación, Qué aprendimos e informe:** mirá qué checks pasaron, qué se
+   observó o se infirió y qué cambió. Explorá los archivos y descargá el ZIP. El
+   código queda en la subcarpeta `output/` de la ejecución. Con **Repetir** probás
+   otra vez con las mismas opciones.
 
 La carpeta elegida está en la máquina que ejecuta Reall. Si abrís una instancia
 en un servidor remoto, los archivos no aparecen automáticamente en tu PC.
@@ -64,10 +72,15 @@ Revisá qué evidencia cita, si existe una prueba para ese comportamiento y qué
 resultado tuvo. Si solo hay una explicación del modelo, tratala como una
 conclusión pendiente de comprobar.
 
-**Completado** significa que terminó el flujo. No significa automáticamente
-«todos los tests pasaron», «es igual al original» ni «está listo para producción».
-En la versión actual, interpretar parte de las evidencias todavía puede requerir
-ayuda técnica. Hacer ese paso más claro es una prioridad del proyecto.
+**Terminado** significa que terminó el flujo. **Verificado** significa que Reall
+ejecutó checks (build, tests) y todos pasaron; lo dice Reall a partir del código
+de salida, no el modelo. Ninguno de los dos significa automáticamente «es igual al
+original» ni «está listo para producción».
+
+En **Qué aprendimos**, cada afirmación aparece como _observada_ (vista en la
+evidencia), _inferida_ (conclusión del modelo) o _desconocida_ (falta evidencia),
+con un clic a su evidencia y al check que la prueba. Si una afirmación no tiene
+evidencia ni check, tratala como pendiente de comprobar.
 
 ## Palabras que vas a encontrar
 
@@ -89,10 +102,11 @@ ayuda técnica. Hacer ese paso más claro es una prioridad del proyecto.
 | Veo la interfaz anterior              | Detené el servidor, actualizá el checkout correcto y reiniciá con `npm run studio`.                           |
 | El navegador no abre                  | Revisá que el comando haya terminado de compilar y que el puerto mostrado pertenezca a esa misma computadora. |
 | El trabajo queda en cola              | Revisá el estado del worker y la terminal donde iniciaste Reall.                                              |
+| El chequeo previo marca algo          | Seguí la indicación de ese punto; no hace falta gastar tokens para comprobarlo de nuevo.                      |
 | Pide aprobación                       | Abrí la ejecución y revisá la acción pendiente. Los permisos se eligen al crear cada ejecución.               |
 | El costo aparece desconocido          | Configurá la tarifa del modelo. Desconocido no significa gratis.                                              |
 | Terminó pero el resultado no funciona | Revisá el informe y la verificación; reducí el alcance y repetí una tarea concreta.                           |
 
-No inicies dos instancias de Reall sobre la misma base de datos. Para guardar una
+Reall no deja iniciar dos workers sobre la misma base de datos: el segundo se detiene y avisa. Para guardar una
 copia de tu trabajo, preservá las carpetas de los proyectos y el estado de Reall
 junto con su clave maestra; consultá la [referencia de datos](../../studio/README.md#datos-y-configuración-de-ejecución).
