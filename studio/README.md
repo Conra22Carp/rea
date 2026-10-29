@@ -8,6 +8,11 @@ con REA y el modelo que elijas. Construida por
 inglés. Es un producto independiente basado en [REA](https://github.com/morluto/rea),
 conservando su [licencia MIT](../LICENSE) y atribución a upstream.
 
+El objetivo de este fork es hacer las funciones de REA más accesibles y
+explicables para un público menos técnico. Para una introducción sin detalles
+de implementación, leé la [guía breve](../docs/reall/guia.md). El
+[README principal](../README.md) distingue el aporte de Reall del motor original.
+
 REA aporta herramientas de análisis por MCP; no depende de Claude ni llama a un
 LLM por sí mismo. Reall añade el agente, las conexiones a proveedores, los
 proyectos, la interfaz y el seguimiento del consumo. El motor de upstream en
@@ -59,9 +64,11 @@ Al actualizar el código, reinicialo para recargar también el worker.
    se aplica solo a esa ejecución. No hay una opción preseleccionada.
    El modelo elegido se conserva. Podés seleccionar explícitamente otro modelo
    guardado para especificación, construcción, verificación e informe.
-5. Revisá la especificación y aprobá o solicitá cambios. Seguí las cinco fases,
-   aprobaciones y eventos en vivo, con los más recientes primero. Explorá archivos, comparalos con la ejecución
-   anterior y descargá el ZIP y el informe `output/REPORT.md`.
+5. Si elegiste revisar la especificación, aprobala o solicitá cambios. Seguí
+   las cinco fases, aprobaciones y eventos en vivo, con los más recientes primero.
+   Explorá archivos, comparalos con la ejecución anterior y descargá el ZIP y
+   el informe `output/REPORT.md`. Un estado «Completado» indica que terminó el
+   flujo; no garantiza que todas las pruebas hayan pasado.
 6. **Consumo** muestra tokens, costo estimado, actividad de los últimos 14 días
    en UTC, ejecuciones recientes y estado del worker. Podés filtrar por proyecto
    o consultar el total. Se actualiza por SSE,
@@ -212,8 +219,9 @@ Save provider credentials in **Settings**, create a project, select a model
 and output folder, and start a run. The wizard covers target, access, scope,
 improvements, and review. Explicitly choose full authorization for that run
 (commands, tools, and specification progression) or step-by-step approval.
-Activity shows the newest events first. Review the specification, approve actions, inspect
-files and diffs, and download the report and ZIP. Your selected model persists;
+Activity shows the newest events first. Review the specification and approve
+actions when your chosen policy requires it. Inspect files and diffs, and
+download the report and ZIP. A completed run does not certify that all tests passed. Your selected model persists;
 changing the build model requires an explicit selection.
 
 Model cards show exact IDs, context windows, and input/output prices. Use the
