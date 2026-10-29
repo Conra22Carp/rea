@@ -112,12 +112,17 @@ herramientas instaladas.
 
 ## Próximos pasos
 
-1. Separar «ejecución terminada» de «resultado verificado», mostrando qué pruebas pasaron, fallaron o no se ejecutaron.
-2. CI propia para `studio/` y protección contra dos instancias sobre los mismos datos.
-3. Un primer proyecto guiado con un ejemplo propio, sin datos reales.
-4. Chequeo de dependencias antes de gastar tokens y versión visible en la interfaz.
-5. Una vista «Qué aprendimos» que enlace cada afirmación con su evidencia.
-6. Instalación más simple, probada en máquinas limpias.
+1. Separar «ejecución terminada» de «resultado verificado», mostrando qué pruebas pasaron, fallaron o no se ejecutaron ([#1](https://github.com/Conra22Carp/reall/issues/1)).
+2. CI propia para `studio/` ([#2](https://github.com/Conra22Carp/reall/issues/2)) y protección contra dos instancias sobre los mismos datos ([#3](https://github.com/Conra22Carp/reall/issues/3)).
+3. Un primer proyecto guiado con un ejemplo propio, sin datos reales ([#4](https://github.com/Conra22Carp/reall/issues/4)).
+4. Chequeo de dependencias antes de gastar tokens y versión visible en la interfaz ([#5](https://github.com/Conra22Carp/reall/issues/5)).
+5. Una vista «Qué aprendimos» que enlace cada afirmación con su evidencia ([#6](https://github.com/Conra22Carp/reall/issues/6)).
+6. Instalación más simple, probada en máquinas limpias ([#7](https://github.com/Conra22Carp/reall/issues/7)).
+7. Permisos elegidos visibles durante toda la ejecución ([#8](https://github.com/Conra22Carp/reall/issues/8)).
+8. Consumo que no se recalcule por cada pestaña conectada ([#9](https://github.com/Conra22Carp/reall/issues/9)).
+9. Errores del backend traducidos al idioma de la interfaz ([#10](https://github.com/Conra22Carp/reall/issues/10)).
+
+Cada punto se discute en los [issues](https://github.com/Conra22Carp/reall/issues). Todo feedback es bienvenido.
 
 ## Documentación de Reall
 
