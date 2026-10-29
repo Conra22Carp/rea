@@ -5,7 +5,7 @@
 [Guía breve](docs/reall/guia.md) · [Instalación](studio/README.md#inicio-local) · [Auditoría y mejoras](docs/reall/auditoria.md) · [Presentación y anuncio](docs/reall/presentacion.md) · [English](#english)
 
 Reall es un **fork independiente de [REA — Reverse Engineer Anything](https://github.com/morluto/rea)**,
-creado por **Conra / [Artesia by Conra](https://artesia.ar)**. REA aporta el motor de
+creado por **[Artesia by Conra](https://artesia.ar)**. REA aporta el motor de
 análisis y sus herramientas. Mi trabajo en este fork se concentra en una capa de
 producto: una interfaz y un flujo guiado para que más personas puedan usar esas
 capacidades, entender qué está pasando y decidir qué hacer con los resultados.
