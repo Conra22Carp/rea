@@ -1,7 +1,7 @@
 # Reall en cinco minutos
 
 Reall es el fork de [REA](https://github.com/morluto/rea) desarrollado por
-Conra / [Artesia by Conra](https://artesia.ar). Añade una interfaz para organizar
+Conra / [Artesia](https://artesia.ar). Añade una interfaz para organizar
 el análisis de una aplicación y pedir una reconstrucción o mejora con IA.
 
 La meta es que puedas seguir el trabajo y tomar decisiones sin conocer cada
