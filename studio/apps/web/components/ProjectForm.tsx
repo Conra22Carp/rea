@@ -26,7 +26,7 @@ import type {
   ProjectRecord,
   StudioSettings,
 } from "@rea-studio/core";
-import { post } from "@/lib/client";
+import { post, messageOf } from "@/lib/client";
 import { dollars, number, useLocale } from "./Locale";
 import {
   Button,
@@ -34,7 +34,9 @@ import {
   ErrorNotice,
   Field,
   Input,
+  NumberInput,
   PageTitle,
+  PriceAge,
   Select,
   Textarea,
   buttonClass,
@@ -252,7 +254,7 @@ export function ProjectForm({
       }
       router.push(`/projects/${result.project.id}`);
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy(false);
     }
@@ -456,6 +458,7 @@ export function ProjectForm({
                               {t("Salida", "Output")}{" "}
                               <b>{dollars(choice.pricing.output, locale)}</b>
                             </span>
+                            <PriceAge pricing={choice.pricing} />
                           </>
                         ) : (
                           <span>
@@ -550,8 +553,8 @@ export function ProjectForm({
             )}
             <p className="field-hint mt-5">
               {t(
-                "Precios de referencia: 27/10/2026. No incluyen impuestos ni servicios externos. Al guardar un modelo nuevo, probamos su conexión y uso de herramientas con una llamada breve que puede tener costo.",
-                "Reference pricing: 2026-10-27. Excludes taxes and external services. Saving a new model tests connectivity and tool calling with a short, potentially billable request.",
+                "Cada tarjeta indica cuándo se consultó su tarifa. No incluyen impuestos ni servicios externos. Al guardar un modelo nuevo, probamos su conexión y uso de herramientas con una llamada breve que puede tener costo.",
+                "Each card shows when its rate was checked. Excludes taxes and external services. Saving a new model tests connectivity and tool calling with a short, potentially billable request.",
               )}
             </p>
           </Card>
@@ -617,29 +620,23 @@ export function ProjectForm({
             </p>
             <div className="estimate-fields">
               <Field label={t("Entrada", "Input")} htmlFor="estimate-input">
-                <Input
+                <NumberInput
                   id="estimate-input"
-                  type="number"
                   min={0}
                   max={10000000}
                   step={1}
                   value={sampleInput}
-                  onChange={(event) =>
-                    setSampleInput(Math.max(0, Number(event.target.value)))
-                  }
+                  onValueChange={(next) => setSampleInput(Math.max(0, next))}
                 />
               </Field>
               <Field label={t("Salida", "Output")} htmlFor="estimate-output">
-                <Input
+                <NumberInput
                   id="estimate-output"
-                  type="number"
                   min={0}
                   max={10000000}
                   step={1}
                   value={sampleOutput}
-                  onChange={(event) =>
-                    setSampleOutput(Math.max(0, Number(event.target.value)))
-                  }
+                  onValueChange={(next) => setSampleOutput(Math.max(0, next))}
                 />
               </Field>
             </div>

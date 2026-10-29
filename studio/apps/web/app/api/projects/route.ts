@@ -15,6 +15,6 @@ export async function POST(request: Request) {
       .parse(await request.json());
     return json({ project: getStore().createProject(input) }, 201);
   } catch (cause) {
-    return badRequest(errorText(cause));
+    return badRequest(errorText(cause, request));
   }
 }

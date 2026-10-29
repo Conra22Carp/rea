@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { JobView } from "@/components/JobView";
+import { jobDetails } from "@/lib/job-details";
 import { getStore } from "@/lib/server";
 export const dynamic = "force-dynamic";
 export default async function Page({
@@ -22,6 +23,7 @@ export default async function Page({
     <JobView
       initial={job}
       initialApprovals={store.listApprovals(id)}
+      initialDetails={await jobDetails(store, job)}
       previousId={previous?.id}
     />
   );

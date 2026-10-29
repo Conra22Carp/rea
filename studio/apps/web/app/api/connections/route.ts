@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       201,
     );
   } catch (cause) {
-    return badRequest(errorText(cause));
+    return badRequest(errorText(cause, request));
   }
 }
 export async function DELETE(request: Request) {
@@ -59,6 +59,6 @@ export async function DELETE(request: Request) {
     );
     return json({ ok: true });
   } catch (cause) {
-    return badRequest(errorText(cause));
+    return badRequest(errorText(cause, request));
   }
 }

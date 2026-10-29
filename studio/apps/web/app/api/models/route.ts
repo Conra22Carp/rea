@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const parsed = createModelSchema.safeParse(
     await request.json().catch(() => null),
   );
-  if (!parsed.success) return badRequest(errorText(parsed.error));
+  if (!parsed.success) return badRequest(errorText(parsed.error, request));
   const body = parsed.data;
   const connection = body.connectionId
     ? getStore().getConnectionConfig(body.connectionId)
@@ -92,6 +92,6 @@ export async function POST(request: Request) {
     });
     return json({ model: record, test }, 201);
   } catch (cause) {
-    return json({ error: errorText(cause) }, 500);
+    return json({ error: errorText(cause, request) }, 500);
   }
 }

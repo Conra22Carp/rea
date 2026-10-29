@@ -12,6 +12,13 @@ export const metadata: Metadata = {
   description:
     "Analizá, reconstruí y mejorá aplicaciones con tus propios modelos. Analyze, rebuild and improve applications with your own models.",
 };
+/** Set by scripts/studio.mjs from studio/package.json and the git checkout. */
+const appVersion = (): string | undefined => {
+  const version = process.env.STUDIO_VERSION;
+  if (!version) return undefined;
+  const commit = process.env.STUDIO_COMMIT;
+  return commit ? `${version} · ${commit}` : version;
+};
 export default async function RootLayout({
   children,
 }: {
@@ -30,7 +37,7 @@ export default async function RootLayout({
           {locale === "es" ? "Ir al contenido" : "Skip to content"}
         </a>
         <LocaleProvider initial={locale}>
-          <Shell>{children}</Shell>
+          <Shell version={appVersion()}>{children}</Shell>
         </LocaleProvider>
       </body>
     </html>

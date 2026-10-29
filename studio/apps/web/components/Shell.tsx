@@ -14,7 +14,14 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useLocale } from "./Locale";
-export function Shell({ children }: { children: ReactNode }) {
+export function Shell({
+  children,
+  version,
+}: {
+  children: ReactNode;
+  /** "1.0.0 · abc1234" when the launcher knows the checkout. */
+  version?: string;
+}) {
   const { t, locale, setLocale } = useLocale();
   const path = usePathname();
   const [open, setOpen] = useState(false);
@@ -131,6 +138,12 @@ export function Shell({ children }: { children: ReactNode }) {
             {t(
               "De la observación a la creación.",
               "From observation to creation.",
+            )}
+            {version && (
+              <>
+                {" "}
+                · <span className="app-version" title={t("Versión y commit en uso", "Version and commit in use")}>v{version}</span>
+              </>
             )}
           </span>
           <a href="https://artesia.ar" target="_blank" rel="noreferrer">

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,6 +15,10 @@ import {
   Smartphone,
   Upload,
   ShieldCheck,
+  CircleAlert,
+  CircleCheck,
+  CircleHelp,
+  Lightbulb,
 } from "lucide-react";
 import {
   LANGUAGES,
@@ -25,11 +29,12 @@ import {
 } from "@rea-studio/core/catalog";
 import type {
   JobRecord,
+  JobSpec,
   ModelRecord,
   ProjectRecord,
   StudioSettings,
 } from "@rea-studio/core";
-import { api } from "@/lib/client";
+import { api, messageOf } from "@/lib/client";
 import { useLocale } from "./Locale";
 import {
   Button,
@@ -37,46 +42,91 @@ import {
   ErrorNotice,
   Field,
   Input,
+  NumberInput,
   PageTitle,
   Select,
   Textarea,
 } from "./ui";
+interface PreflightResult {
+  checks: { id: string; status: "ok" | "warn" | "fail"; detail?: string }[];
+  ready: boolean;
+}
+
+/** The choices a new run starts from: a previous run, the example, or blanks. */
+const startingSpec = (
+  initialSpec: JobSpec | undefined,
+  examplePath: string | undefined,
+  locale: "es" | "en",
+): Partial<JobSpec> | undefined => {
+  if (initialSpec) return initialSpec;
+  if (!examplePath) return undefined;
+  const es = locale === "es";
+  return {
+    title: es ? "Entender la búsqueda" : "Understand the search",
+    target: { kind: "javascript", path: examplePath },
+    scope: {
+      mode: "feature",
+      description: es
+        ? "Cómo funciona la búsqueda: qué busca y qué pasa si no encuentra resultados."
+        : "How the search works: what it matches and what happens when nothing matches.",
+    },
+    enhancement: {
+      hardening: ["tests"],
+      instructions: es
+        ? "Conservá el comportamiento y agregá pruebas para mayúsculas y consultas vacías."
+        : "Keep the behavior and add tests for case-insensitive matching and empty queries.",
+    },
+  };
+};
+
 export function JobWizard({
   project,
   models,
   settings,
   workerAlive,
+  initialSpec,
+  examplePath,
 }: {
   project: ProjectRecord;
   models: ModelRecord[];
   settings: StudioSettings;
   workerAlive: boolean;
+  /** A previous run of this project to start from; secrets are not included. */
+  initialSpec?: JobSpec;
+  /** Absolute path of the guided example, when starting from it. */
+  examplePath?: string;
 }) {
   const { t, locale } = useLocale();
   const router = useRouter();
+  const start = startingSpec(initialSpec, examplePath, locale);
   const [step, setStep] = useState(0);
-  const [title, setTitle] = useState("");
-  const [kind, setKind] = useState<TargetKind>("web");
-  const [url, setUrl] = useState("");
-  const [path, setPath] = useState("");
+  const [title, setTitle] = useState(start?.title ?? "");
+  const [kind, setKind] = useState<TargetKind>(start?.target?.kind ?? "web");
+  const [url, setUrl] = useState(start?.target?.url ?? "");
+  const [path, setPath] = useState(start?.target?.path ?? "");
   const [file, setFile] = useState<File>();
-  const [access, setAccess] = useState<AccessMode>("none");
+  const [access, setAccess] = useState<AccessMode>(start?.access?.mode ?? "none");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loginUrl, setLoginUrl] = useState("");
+  const [loginUrl, setLoginUrl] = useState(start?.access?.loginUrl ?? "");
   const [cookies, setCookies] = useState("");
-  const [cdpPort, setCdpPort] = useState(9222);
-  const [scope, setScope] = useState<ScopeMode>("full");
-  const [description, setDescription] = useState("");
-  const [language, setLanguage] = useState("");
-  const [framework, setFramework] = useState("");
-  const [stack, setStack] = useState("");
-  const [hardening, setHardening] = useState<HardeningId[]>(["tests"]);
-  const [instructions, setInstructions] = useState("");
-  const [tokens, setTokens] = useState(settings.maxTotalTokens);
-  const [maxSteps, setMaxSteps] = useState(settings.maxStepsPerPhase);
-  const [maxCost, setMaxCost] = useState("");
-  const [specReview, setSpecReview] = useState(settings.specReview);
+  const [cdpPort, setCdpPort] = useState(start?.access?.cdpPort ?? 9222);
+  const [scope, setScope] = useState<ScopeMode>(start?.scope?.mode ?? "full");
+  const [description, setDescription] = useState(start?.scope?.description ?? "");
+  const [language, setLanguage] = useState(start?.enhancement?.port?.language ?? "");
+  const [framework, setFramework] = useState(start?.enhancement?.port?.framework ?? "");
+  const [stack, setStack] = useState(start?.enhancement?.stack ?? "");
+  const [hardening, setHardening] = useState<HardeningId[]>([
+    ...(start?.enhancement?.hardening ?? ["tests"]),
+  ]);
+  const [instructions, setInstructions] = useState(start?.enhancement?.instructions ?? "");
+  const [tokens, setTokens] = useState(start?.budget?.maxTotalTokens ?? settings.maxTotalTokens);
+  const [maxSteps, setMaxSteps] = useState(start?.budget?.maxStepsPerPhase ?? settings.maxStepsPerPhase);
+  const [maxCost, setMaxCost] = useState(
+    start?.budget?.maxCostUsd !== undefined ? String(start.budget.maxCostUsd) : "",
+  );
+  const [specReview, setSpecReview] = useState(start?.approvals?.specReview ?? settings.specReview);
+  const [preflight, setPreflight] = useState<PreflightResult>();
   const [permissionMode, setPermissionMode] = useState<"ask" | "auto" | "">("");
   const [authorized, setAuthorized] = useState(false);
   const [buildModel, setBuildModel] = useState(project.modelId);
@@ -90,6 +140,39 @@ export function JobWizard({
     t("Mejoras", "Improvements"),
     t("Revisar", "Review"),
   ];
+  // Check this machine before the run can spend tokens.
+  useEffect(() => {
+    if (step !== 4) return;
+    let cancelled = false;
+    setPreflight(undefined);
+    const query = new URLSearchParams({
+      project: project.id,
+      kind,
+      access: kind === "web" ? access : "none",
+    });
+    api<PreflightResult>(`/api/preflight?${query}`)
+      .then((result) => {
+        if (!cancelled) setPreflight(result);
+      })
+      .catch((cause) => {
+        if (!cancelled) setError(messageOf(cause));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, kind, access, project.id]);
+  const preflightLabel = (id: string): readonly [string, string] =>
+    (({
+      node: [t("Node.js compatible", "Supported Node.js"), t("Instalá la versión de .nvmrc (24.22.1).", "Install the version in .nvmrc (24.22.1).")],
+      rea: [t("Motor REA", "REA engine"), t("Si no hay un build local, Reall descarga la versión fijada de REA con npx la primera vez (requiere internet).", "Without a local build, Reall downloads the pinned REA release with npx on first use (needs internet).")],
+      browser: [t("Chrome o Chromium", "Chrome or Chromium"), t("Instalá Chrome o Chromium, o definí STUDIO_BROWSER_PATH.", "Install Chrome or Chromium, or set STUDIO_BROWSER_PATH.")],
+      java: [t("Java (JDK)", "Java (JDK)"), t("Instalá un JDK completo con java en el PATH.", "Install a full JDK with java on PATH.")],
+      jadx: [t("JADX para Android", "JADX for Android"), t("Definí REA_JADX_MCP_JAR con la ruta absoluta al JAR indicado por REA.", "Set REA_JADX_MCP_JAR to the absolute path of the JAR REA documents.")],
+      "native-provider": [t("Proveedor nativo (Ghidra, Hopper o IDA)", "Native provider (Ghidra, Hopper or IDA)"), t("Reall no puede confirmarlo: configuralo según la documentación de REA.", "Reall cannot confirm it: configure it as REA's documentation describes.")],
+      worker: [t("Worker de Reall activo", "Reall worker running"), t("Iniciá Reall con npm run studio y mantené la terminal abierta.", "Start Reall with npm run studio and keep the terminal open.")],
+      folder: [t("Carpeta del proyecto con permiso de escritura", "Writable project folder"), t("Elegí una carpeta en la que tu usuario pueda escribir.", "Choose a folder your user can write to.")],
+      model: [t("Modelo con credenciales", "Model with credentials"), t("Guardá la API key de esta conexión en Configuración.", "Save this connection's API key in Settings.")],
+    }) as Record<string, readonly [string, string]>)[id] ?? [id, ""];
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -104,6 +187,15 @@ export function JobWizard({
         return;
       }
       setStep(step + 1);
+      return;
+    }
+    if (preflight && !preflight.ready) {
+      setError(
+        t(
+          "Resolvé los puntos marcados en el chequeo previo antes de iniciar.",
+          "Resolve the items flagged by the pre-run check before starting.",
+        ),
+      );
       return;
     }
     if (!permissionMode) {
@@ -167,7 +259,7 @@ export function JobWizard({
       setCookies("");
       router.push(`/jobs/${result.job.id}`);
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy(false);
     }
@@ -429,16 +521,13 @@ export function JobWizard({
                         label={t("Puerto de depuración", "Debugging port")}
                         htmlFor="cdp-port"
                       >
-                        <Input
+                        <NumberInput
                           id="cdp-port"
-                          type="number"
                           required
                           min={1}
                           max={65535}
                           value={cdpPort}
-                          onChange={(event) =>
-                            setCdpPort(Number(event.target.value))
-                          }
+                          onValueChange={setCdpPort}
                         />
                       </Field>
                     </>
@@ -653,14 +742,13 @@ export function JobWizard({
                   label={t("Máximo de tokens", "Maximum tokens")}
                   htmlFor="max-tokens"
                 >
-                  <Input
+                  <NumberInput
                     id="max-tokens"
                     required
-                    type="number"
                     min={10000}
                     max={10000000}
                     value={tokens}
-                    onChange={(event) => setTokens(Number(event.target.value))}
+                    onValueChange={setTokens}
                   />
                 </Field>
                 <Field
@@ -670,16 +758,13 @@ export function JobWizard({
                   )}
                   htmlFor="max-steps"
                 >
-                  <Input
+                  <NumberInput
                     id="max-steps"
                     required
-                    type="number"
                     min={5}
                     max={500}
                     value={maxSteps}
-                    onChange={(event) =>
-                      setMaxSteps(Number(event.target.value))
-                    }
+                    onValueChange={setMaxSteps}
                   />
                 </Field>
               </div>
@@ -828,6 +913,36 @@ export function JobWizard({
                   "I own the target or have permission to analyze and reproduce it.",
                 )}
               </label>
+              <div className="field">
+                <label>{t("Chequeo previo", "Pre-run check")}</label>
+                {!preflight ? (
+                  <p className="field-hint">{t("Revisando esta máquina…", "Checking this machine…")}</p>
+                ) : (
+                  <ul className="preflight">
+                    {preflight.checks.map((check) => {
+                      const [label, hint] = preflightLabel(check.id);
+                      const Icon =
+                        check.status === "ok" ? CircleCheck : check.status === "fail" ? CircleAlert : CircleHelp;
+                      return (
+                        <li key={check.id} className={`preflight-${check.status}`}>
+                          <Icon size={16} />
+                          <div>
+                            <strong>{label}</strong>
+                            {check.detail && <small>{check.detail}</small>}
+                            {check.status !== "ok" && <small>{hint}</small>}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <p className="field-hint">
+                  {t(
+                    "No llama al modelo ni gasta tokens: solo revisa lo que la ejecución necesita en esta máquina.",
+                    "It does not call the model or spend tokens: it only checks what the run needs on this machine.",
+                  )}
+                </p>
+              </div>
               {!workerAlive && (
                 <p className="notice notice-warning">
                   {t(
@@ -851,7 +966,7 @@ export function JobWizard({
               <ArrowLeft size={15} />
               {t("Atrás", "Back")}
             </Button>
-            <Button type="submit" busy={busy}>
+            <Button type="submit" busy={busy} disabled={step === 4 && preflight?.ready === false}>
               {step === 4 ? (
                 <>
                   <Play size={15} />
@@ -896,6 +1011,34 @@ export function JobWizard({
               "Follow each phase, review approvals, and download your code when finished.",
             )}
           </p>
+          {examplePath && !initialSpec && (
+            <>
+              <div className="summary-divider" />
+              <div className="summary-item">
+                <Lightbulb size={18} />
+                <div>
+                  <small>{t("Qué deberías ver", "What you should see")}</small>
+                  <ul className="expected-list">
+                    <li>{t("El análisis encuentra searchNotes.", "Analysis finds searchNotes.")}</li>
+                    <li>{t("La búsqueda ignora mayúsculas.", "Search ignores case.")}</li>
+                    <li>{t("Una consulta vacía no devuelve nada.", "An empty query returns nothing.")}</li>
+                    <li>{t("Checks de pruebas que pasan.", "Passing test checks.")}</li>
+                  </ul>
+                </div>
+              </div>
+            </>
+          )}
+          {initialSpec && (
+            <>
+              <div className="summary-divider" />
+              <p className="field-hint">
+                {t(
+                  "Empezaste desde una ejecución anterior. Por seguridad, las credenciales y el permiso no se copian: volvé a cargarlos.",
+                  "You started from a previous run. For safety, credentials and the permission choice are not copied: enter them again.",
+                )}
+              </p>
+            </>
+          )}
         </aside>
       </form>
     </>

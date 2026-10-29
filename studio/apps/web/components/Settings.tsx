@@ -24,7 +24,7 @@ import type {
   ModelRecord,
   StudioSettings,
 } from "@rea-studio/core";
-import { api, post } from "@/lib/client";
+import { api, post, messageOf } from "@/lib/client";
 import { dollars, useLocale } from "./Locale";
 import {
   Button,
@@ -32,7 +32,9 @@ import {
   ErrorNotice,
   Field,
   Input,
+  NumberInput,
   PageTitle,
+  PriceAge,
   Select,
   Tag,
 } from "./ui";
@@ -84,7 +86,7 @@ export function Settings({
       );
       setSuccess(true);
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy("");
     }
@@ -98,7 +100,7 @@ export function Settings({
       setLocale(settings.language);
       setSuccess(true);
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy("");
     }
@@ -117,7 +119,7 @@ export function Settings({
       await api(`/api/connections?id=${id}`, { method: "DELETE" });
       setConnections((items) => items.filter((item) => item.id !== id));
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     }
   }
   async function testModel(id: string) {
@@ -140,7 +142,7 @@ export function Settings({
         );
       setSuccess(true);
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy("");
     }
@@ -457,6 +459,7 @@ export function Settings({
                         ) : (
                           t("Personalizada", "Custom")
                         )}
+                        {preset.pricing && <PriceAge pricing={preset.pricing} />}
                       </td>
                     </tr>
                   ))}
@@ -465,8 +468,8 @@ export function Settings({
             </div>
             <p className="field-hint mt-4">
               {t(
-                "Referencia consultada el 27/10/2026. Las tarifas pueden cambiar. Los contextos largos usan su tarifa correspondiente. No incluye impuestos, herramientas externas, almacenamiento de caché ni hardware local. Los endpoints personalizados requieren sus propias tarifas.",
-                "Reference retrieved 2026-10-27. Rates may change. Long contexts use their applicable tier. Excludes taxes, external tools, cache storage, and local hardware. Custom endpoints require their own rates.",
+                "Cada tarifa indica cuándo se consultó y se marca si tiene más de 30 días. Las tarifas pueden cambiar. Los contextos largos usan su tarifa correspondiente. No incluye impuestos, herramientas externas, almacenamiento de caché ni hardware local. Los endpoints personalizados requieren sus propias tarifas.",
+                "Each rate shows when it was checked and is flagged after 30 days. Rates may change. Long contexts use their applicable tier. Excludes taxes, external tools, cache storage, and local hardware. Custom endpoints require their own rates.",
               )}
             </p>
           </Card>
@@ -513,7 +516,7 @@ export function Settings({
                         items.filter((item) => item.id !== model.id),
                       );
                     } catch (cause) {
-                      setError(String(cause));
+                      setError(messageOf(cause));
                     }
                   }}
                 >
@@ -594,38 +597,26 @@ export function Settings({
                 label={t("Presupuesto de tokens", "Token budget")}
                 htmlFor="default-tokens"
               >
-                <Input
+                <NumberInput
                   id="default-tokens"
-                  type="number"
                   min={10000}
                   max={10000000}
                   required
                   value={settings.maxTotalTokens}
-                  onChange={(event) =>
-                    setSettings({
-                      ...settings,
-                      maxTotalTokens: Number(event.target.value),
-                    })
-                  }
+                  onValueChange={(next) => setSettings({ ...settings, maxTotalTokens: next })}
                 />
               </Field>
               <Field
                 label={t("Pasos por fase", "Steps per phase")}
                 htmlFor="default-steps"
               >
-                <Input
+                <NumberInput
                   id="default-steps"
-                  type="number"
                   min={5}
                   max={500}
                   required
                   value={settings.maxStepsPerPhase}
-                  onChange={(event) =>
-                    setSettings({
-                      ...settings,
-                      maxStepsPerPhase: Number(event.target.value),
-                    })
-                  }
+                  onValueChange={(next) => setSettings({ ...settings, maxStepsPerPhase: next })}
                 />
               </Field>
             </div>

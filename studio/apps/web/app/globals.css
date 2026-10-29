@@ -626,6 +626,30 @@ svg {
   background: #f3f3f3;
   color: #878787;
 }
+.verification {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 9px;
+  white-space: nowrap;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.verification-verified {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
+.verification-failed {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.verification-unverified {
+  background: #f0f0f0;
+  color: #6a6a6a;
+}
 .empty-state {
   padding: 45px 20px;
   display: flex;
@@ -2895,4 +2919,211 @@ progress {
   font-size: 12px;
   line-height: 1.6;
   margin-top: 6px;
+}
+
+/* Reall v1: run policy, verification, changes and findings */
+.run-policy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 22px;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+.run-policy-note {
+  flex: 1 1 260px;
+}
+.verification-card .section-heading,
+.changes-card .section-heading {
+  align-items: flex-start;
+}
+.verification-empty {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.check-list,
+.changes-grid ul,
+.learned ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.check-list li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+}
+.check-list li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.check-list strong {
+  font-size: 12px;
+}
+.check-list code,
+.changes-grid code,
+.learned code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.check-list small,
+.changes-grid small {
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.check-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--ink);
+}
+.check-list li.passed .check-mark {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
+.changes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.changes-grid h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.changes-grid li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--rule);
+}
+.tabs > .notify-toggle {
+  margin-left: auto;
+  padding: 7px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 10px;
+}
+.tabs > .notify-toggle[aria-pressed="true"] {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 500;
+}
+.tabs > .notify-toggle + .live-indicator {
+  margin-left: 0;
+}
+.learned {
+  display: grid;
+  gap: 18px;
+}
+.learned-group h2 small {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+.learned-group li {
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+}
+.learned-group li p {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.learned-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.learned-check {
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+}
+.learned-check.passed {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--signal-ink);
+}
+.learned-check.failed {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.preflight {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 18px;
+}
+.preflight li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 9px 0;
+  border-top: 1px solid var(--rule);
+  font-size: 12px;
+}
+.preflight li small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.preflight-fail strong {
+  color: var(--ink);
+}
+.preflight-ok {
+  color: var(--ink-2);
+}
+.price-age {
+  display: block;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.price-age.stale {
+  color: var(--ink);
+  font-weight: 600;
+}
+.app-version {
+  color: #8a8a8a;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+@media (max-width: 760px) {
+  .changes-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.expected-list {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+  color: var(--ink-2);
+  display: grid;
+  gap: 3px;
+}
+.try-example {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.try-example small {
+  color: var(--ink);
+  font-size: 11px;
+  max-width: 320px;
 }

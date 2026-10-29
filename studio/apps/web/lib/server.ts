@@ -2,6 +2,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { studioHome, StudioStore } from "@rea-studio/core";
+import { z } from "zod";
 
 const globalStore = globalThis as { __reaStudioStore?: StudioStore };
 
@@ -61,18 +62,32 @@ export const workerHeartbeat = (): Date | undefined => {
   }
 };
 
-export const errorText = (cause: unknown): string => {
-  if (
-    cause &&
-    typeof cause === "object" &&
-    "issues" in cause &&
-    Array.isArray(cause.issues)
-  ) {
+/** The interface language of the browser that sent the request. */
+export const requestLocale = (request: Request): "es" | "en" => {
+  const cookie = request.headers.get("cookie") ?? "";
+  const saved = /(?:^|;\s*)reall-language=(es|en)/.exec(cookie)?.[1];
+  return saved === "en" || saved === "es"
+    ? saved
+    : getStore().getSettings().language;
+};
+
+const spanishIssues = z.locales.es();
+
+/**
+ * One line per validation issue, in the request's language when one is
+ * given. Other errors keep their English text; the client translates them.
+ */
+export const errorText = (cause: unknown, request?: Request): string => {
+  if (cause instanceof z.ZodError) {
+    const spanish = request && requestLocale(request) === "es";
     return cause.issues
-      .map(
-        (issue: { path?: unknown[]; message?: string }) =>
-          `${(issue.path ?? []).join(".") || "input"}: ${issue.message ?? "invalid"}`,
-      )
+      .map((issue) => {
+        const message = spanish
+          ? (spanishIssues.localeError(issue as never) as string | undefined) ??
+            issue.message
+          : issue.message;
+        return `${issue.path.join(".") || (spanish ? "entrada" : "input")}: ${message}`;
+      })
       .join("; ");
   }
   return cause instanceof Error ? cause.message : String(cause);

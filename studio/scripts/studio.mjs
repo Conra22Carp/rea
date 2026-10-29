@@ -3,6 +3,7 @@
 //   npm run studio   rebuild and start the production server
 //   npm run dev      development server with hot reload
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +11,15 @@ import { fileURLToPath } from "node:url";
 process.env.STUDIO_SESSION_TOKEN = randomBytes(32).toString("hex");
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+// Shown in the interface so the user knows which checkout is running.
+process.env.STUDIO_VERSION = JSON.parse(
+  readFileSync(join(root, "package.json"), "utf8"),
+).version;
+const commit = spawnSync("git", ["rev-parse", "--short", "HEAD"], {
+  cwd: root,
+  encoding: "utf8",
+});
+if (commit.status === 0) process.env.STUDIO_COMMIT = commit.stdout.trim();
 const dev = process.argv.includes("--dev");
 const host = process.env.STUDIO_HOST ?? "127.0.0.1";
 const port = process.env.STUDIO_PORT ?? "4317";
@@ -83,7 +93,11 @@ process.once("SIGTERM", () => stop(0));
 for (const child of children) {
   child.once("exit", (code) => {
     if (!stopping) {
-      console.error(`[studio] A process exited (code ${code}); stopping.`);
+      console.error(
+        code === 3
+          ? "[studio] Another Reall worker already uses this state folder. Stop the other instance or set a different STUDIO_HOME; stopping."
+          : `[studio] A process exited (code ${code}); stopping.`,
+      );
       stop(code ?? 1);
     }
   });

@@ -91,6 +91,8 @@ describe.skipIf(resolveReaLaunch().source === "npx")("processJob", () => {
     expect(result.status).toBe("succeeded");
     expect(db.getJob(job.id)?.status).toBe("succeeded");
     expect(db.getJob(job.id)?.usage.totalTokens).toBeGreaterThan(0);
+    // A model that only writes prose recorded no checks: finished, not verified.
+    expect(db.getJob(job.id)?.verification).toEqual({ status: "unverified", passed: 0, failed: 0, total: 0 });
     expect(existsSync(join(job.workspace, "output", "REPORT.md"))).toBe(true);
     const types = db.listEvents(job.id).map(({ event }) =>
       event.type === "approval" ? `approval:${event.status}` : event.type,

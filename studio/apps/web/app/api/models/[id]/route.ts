@@ -21,7 +21,7 @@ export async function DELETE(
   try {
     store.deleteModel(id);
   } catch (cause) {
-    return badRequest(errorText(cause));
+    return badRequest(errorText(cause, request));
   }
   return json({ deleted: id });
 }

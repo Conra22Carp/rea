@@ -5,3 +5,6 @@ export * from "./crypto.js";
 export * from "./store.js";
 export * from "./validation.js";
 export * from "./pricing.js";
+export * from "./messages.js";
+export * from "./verification.js";
+export * from "./worker-lock.js";

@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type { JobStatus } from "@rea-studio/core/types";
+import type { JobStatus, VerificationSummary } from "@rea-studio/core/types";
 export type Locale = "es" | "en";
 const Context = createContext({
   locale: "es" as Locale,
@@ -34,11 +34,25 @@ export function statusLabel(status: JobStatus, locale: Locale) {
     queued: ["En cola", "Queued"],
     running: ["En ejecución", "Running"],
     waiting_approval: ["Requiere revisión", "Needs review"],
-    succeeded: ["Completado", "Completed"],
+    // Finished is not verified: verification has its own label.
+    succeeded: ["Terminado", "Finished"],
     failed: ["Falló", "Failed"],
     cancelled: ["Cancelado", "Cancelled"],
   };
   return values[status][locale === "es" ? 0 : 1];
+}
+/** Derived from the checks Reall ran itself, never from the report's prose. */
+export function verificationLabel(summary: VerificationSummary, locale: Locale) {
+  const es = locale === "es";
+  if (summary.status === "verified")
+    return es
+      ? `Verificado · ${summary.passed}/${summary.total} checks`
+      : `Verified · ${summary.passed}/${summary.total} checks`;
+  if (summary.status === "failed")
+    return es
+      ? `Con fallas · ${summary.failed} de ${summary.total} checks`
+      : `Failing · ${summary.failed} of ${summary.total} checks`;
+  return es ? "Sin verificar" : "Not verified";
 }
 export const number = (value: number, locale: Locale) =>
   new Intl.NumberFormat(locale === "es" ? "es-AR" : "en-US").format(value);

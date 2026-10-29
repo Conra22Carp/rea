@@ -15,6 +15,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { useLocale } from "@/components/Locale";
+import { TryExample } from "@/components/TryExample";
 import { buttonClass } from "@/components/ui";
 export default function HomePage() {
   const { t } = useLocale();
@@ -72,6 +73,7 @@ export default function HomePage() {
               {t("Crear mi primer proyecto", "Create my first project")}
               <ArrowRight size={17} />
             </Link>
+            <TryExample />
             <a href="#how-it-works" className="text-link">
               {t("Cómo funciona", "How it works")}
               <ArrowUpRight size={15} />

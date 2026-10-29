@@ -15,6 +15,18 @@ export interface ModelPricing {
   readonly source: string;
   readonly checkedAt: string;
 }
+/** Reference prices older than this are flagged as possibly outdated. */
+export const PRICE_STALE_DAYS = 30;
+
+/** Whole days since a price was checked, or undefined for custom rates. */
+export const priceAgeDays = (
+  pricing: Pick<ModelPricing, "checkedAt">,
+  now = Date.now(),
+): number | undefined => {
+  const checked = Date.parse(pricing.checkedAt);
+  return Number.isNaN(checked) ? undefined : Math.max(0, Math.floor((now - checked) / 86_400_000));
+};
+
 export interface ModelPreset {
   readonly id: string;
   readonly provider: ProviderId;

@@ -89,6 +89,41 @@ export interface ApprovalDecision {
 
 export type ToolSource = "rea" | "workspace" | "studio";
 
+/** One build or test command Reall ran itself and recorded with its exit code. */
+export interface VerificationCheck {
+  readonly name: string;
+  readonly command: string;
+  readonly cwd: string;
+  readonly exitCode: number | null;
+  readonly passed: boolean;
+  readonly timedOut: boolean;
+  readonly durationMs: number;
+  readonly outputTail: string;
+  readonly finishedAt: string;
+}
+
+/**
+ * Derived only from recorded checks, never from the model's prose:
+ * verified needs at least one check and no failures.
+ */
+export interface VerificationSummary {
+  readonly status: "verified" | "failed" | "unverified";
+  readonly passed: number;
+  readonly failed: number;
+  readonly total: number;
+}
+
+export type FindingKind = "observed" | "inferred" | "unknown";
+
+/** A claim from output/findings.json with the evidence that supports it. */
+export interface Finding {
+  readonly claim: string;
+  readonly kind: FindingKind;
+  readonly evidence: readonly string[];
+  /** Name of the recorded verification check that tests this claim. */
+  readonly check?: string;
+}
+
 export type JobEvent =
   | {
       readonly type: "phase";
@@ -148,10 +183,16 @@ export type JobEvent =
       readonly message: string;
     }
   | {
+      readonly type: "check";
+      readonly phase: PhaseId;
+      readonly check: VerificationCheck;
+    }
+  | {
       readonly type: "done";
       readonly status: "succeeded" | "failed" | "cancelled";
       readonly reportPath?: string;
       readonly error?: string;
+      readonly verification?: VerificationSummary;
     };
 
 export type JobStatus =

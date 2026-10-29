@@ -1,14 +1,17 @@
 "use client";
-import type {
-  ButtonHTMLAttributes,
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
+import {
+  useEffect,
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
 } from "react";
-import type { JobStatus } from "@rea-studio/core/types";
-import { AlertCircle, LoaderCircle } from "lucide-react";
-import { statusLabel, useLocale } from "./Locale";
+import type { JobStatus, VerificationSummary } from "@rea-studio/core/types";
+import { PRICE_STALE_DAYS, priceAgeDays, type ModelPricing } from "@rea-studio/core/pricing";
+import { AlertCircle, LoaderCircle, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
+import { statusLabel, useLocale, verificationLabel } from "./Locale";
 export const buttonClass = (
   variant: "primary" | "ghost" | "danger" | "quiet" = "primary",
   extra = "",
@@ -38,6 +41,42 @@ export const Input = ({
 }: InputHTMLAttributes<HTMLInputElement>) => (
   <input {...props} className={`field-input ${className}`} />
 );
+/**
+ * A number field that keeps the typed text while it is being edited, so a
+ * cleared field does not turn into a 0 that the next digits append to.
+ */
+export const NumberInput = ({
+  value,
+  onValueChange,
+  onBlur,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type"> & {
+  value: number;
+  onValueChange: (value: number) => void;
+}) => {
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    setText((current) =>
+      current.trim() !== "" && Number(current) === value ? current : String(value),
+    );
+  }, [value]);
+  return (
+    <Input
+      {...props}
+      type="number"
+      value={text}
+      onChange={(event) => {
+        setText(event.target.value);
+        const next = event.target.valueAsNumber;
+        if (event.target.value.trim() !== "" && Number.isFinite(next)) onValueChange(next);
+      }}
+      onBlur={(event) => {
+        if (text.trim() === "") setText(String(value));
+        onBlur?.(event);
+      }}
+    />
+  );
+};
 export const Textarea = ({
   className = "",
   ...props
@@ -98,6 +137,40 @@ export const StatusPill = ({ status }: { status: JobStatus }) => {
       <span />
       {statusLabel(status, locale)}
     </span>
+  );
+};
+export const VerificationBadge = ({
+  verification,
+}: {
+  verification: VerificationSummary;
+}) => {
+  const { locale } = useLocale();
+  const Icon =
+    verification.status === "verified"
+      ? ShieldCheck
+      : verification.status === "failed"
+        ? ShieldAlert
+        : ShieldQuestion;
+  return (
+    <span className={`verification verification-${verification.status}`}>
+      <Icon size={12} />
+      {verificationLabel(verification, locale)}
+    </span>
+  );
+};
+/** When a reference price was checked, and a warning once it is old. */
+export const PriceAge = ({ pricing }: { pricing: Pick<ModelPricing, "checkedAt"> }) => {
+  const { t, locale } = useLocale();
+  const days = priceAgeDays(pricing);
+  if (days === undefined) return null;
+  const date = new Date(`${pricing.checkedAt}T12:00:00Z`).toLocaleDateString(locale === "es" ? "es-AR" : "en-US");
+  const stale = days > PRICE_STALE_DAYS;
+  return (
+    <small className={`price-age ${stale ? "stale" : ""}`}>
+      {stale
+        ? t(`Tarifa del ${date}: puede estar desactualizada`, `Rate from ${date}: may be outdated`)
+        : t(`Tarifa consultada el ${date}`, `Rate checked ${date}`)}
+    </small>
   );
 };
 export const Tag = ({ children }: { children: ReactNode }) => (

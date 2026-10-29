@@ -8,3 +8,4 @@ export * from "./reaTools.js";
 export * from "./redact.js";
 export * from "./skill.js";
 export * from "./workspace.js";
+export * from "./preflight.js";

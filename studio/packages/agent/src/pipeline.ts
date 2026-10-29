@@ -2,12 +2,17 @@ import { cp, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, isAbsolute, relative, resolve } from "node:path";
 
 import {
+  FINDINGS_FILE,
   PHASES,
   estimateTokenCost,
+  parseFindings,
+  summarizeChecks,
   type JobSecrets,
   type JobSpec,
   type ModelConfig,
   type PhaseId,
+  type VerificationCheck,
+  type VerificationSummary,
 } from "@rea-studio/core";
 import {
   isStepCount,
@@ -67,6 +72,8 @@ export interface RunJobResult {
   readonly reportPath?: string;
   readonly error?: string;
   readonly usage: Usage;
+  /** From the checks Reall ran itself during verification. */
+  readonly verification: VerificationSummary;
 }
 
 /** File each phase must leave behind; missing files get the model's final text. */
@@ -93,6 +100,9 @@ const PHASE_TOOLS: Record<PhaseId, { write: boolean; commands: boolean }> = {
   verify: { write: true, commands: true },
   report: { write: true, commands: false },
 };
+
+/** Only verification records checks, so a fix-and-retry in build never counts. */
+const CHECK_PHASES = new Set<PhaseId>(["verify"]);
 
 const MAX_SPEC_REVISIONS = 3;
 
@@ -168,6 +178,8 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
     estimatedCostUsd: 0,
     unpricedTokens: 0,
   };
+  const checks: VerificationCheck[] = [];
+  const verification = () => summarizeChecks(checks);
   const budget = new AbortController();
   const signal = AbortSignal.any([options.signal, budget.signal]);
   const ws = new Workspace(options.workspaceRoot);
@@ -232,6 +244,14 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
       });
     }
     const browserExecutable = detectBrowserExecutable();
+    if (
+      spec.target.kind === "web" &&
+      spec.access.mode !== "connect" &&
+      !browserExecutable
+    ) {
+      // Fail before any model call: a web run cannot capture anything without one.
+      throw new Error("No browser was found for this web target.");
+    }
     const prompt: PromptContext = {
       spec,
       secretIds: secretEnv.labels,
@@ -250,7 +270,12 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
       currentPhase = phase;
       ctx.phase = phase;
       const tools: ToolSet = {
-        ...workspaceTools(ws, ctx, PHASE_TOOLS[phase]),
+        ...workspaceTools(ws, ctx, {
+          ...PHASE_TOOLS[phase],
+          ...(CHECK_PHASES.has(phase)
+            ? { onCheck: (check: VerificationCheck) => checks.push(check) }
+            : {}),
+        }),
         ...reaTools(session as ReaSession, definitions, ws, ctx, {
           kind: spec.target.kind,
           phase,
@@ -354,6 +379,7 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
         status: "finished",
         summary: redactor.redact(summary.trim().slice(0, 1_500)),
       });
+      if (phase === "report") await reportFindings(ws, safeEmit);
     }
 
     if (signal.aborted) {
@@ -367,8 +393,18 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
         ...(reason ? { summary: reason } : {}),
       });
       const status = budget.signal.aborted ? "failed" : "cancelled";
-      safeEmit({ type: "done", status, ...(reason ? { error: reason } : {}) });
-      return { status, ...(reason ? { error: reason } : {}), usage };
+      safeEmit({
+        type: "done",
+        status,
+        ...(reason ? { error: reason } : {}),
+        verification: verification(),
+      });
+      return {
+        status,
+        ...(reason ? { error: reason } : {}),
+        usage,
+        verification: verification(),
+      };
     }
     const reportPath = PHASE_OUTPUT.report;
     const hasReport = await exists(ws.path(reportPath));
@@ -376,8 +412,14 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
       type: "done",
       status: "succeeded",
       ...(hasReport ? { reportPath } : {}),
+      verification: verification(),
     });
-    return { status: "succeeded", ...(hasReport ? { reportPath } : {}), usage };
+    return {
+      status: "succeeded",
+      ...(hasReport ? { reportPath } : {}),
+      usage,
+      verification: verification(),
+    };
   } catch (cause: unknown) {
     const cancelled =
       cause instanceof CancelledError ||
@@ -394,12 +436,36 @@ export const runJob = async (options: RunJobOptions): Promise<RunJobResult> => {
       summary: message,
     });
     const status = cancelled ? "cancelled" : "failed";
-    safeEmit({ type: "done", status, error: message });
-    return { status, error: message, usage };
+    safeEmit({
+      type: "done",
+      status,
+      error: message,
+      verification: verification(),
+    });
+    return { status, error: message, usage, verification: verification() };
   } finally {
     ws.stopAll();
     await session?.close().catch(() => undefined);
   }
+};
+
+/** Say how many structured findings the report left, so gaps are visible. */
+const reportFindings = async (ws: Workspace, emit: Emit): Promise<void> => {
+  const source = await readFile(ws.path(FINDINGS_FILE), "utf8").catch(() => undefined);
+  if (source === undefined) {
+    emit({
+      type: "log",
+      level: "warn",
+      message: `The report did not write ${FINDINGS_FILE}; claims are only in REPORT.md.`,
+    });
+    return;
+  }
+  const { findings, rejected } = parseFindings(source);
+  emit({
+    type: "log",
+    level: rejected > 0 ? "warn" : "info",
+    message: `${FINDINGS_FILE}: ${findings.length} claims${rejected > 0 ? `, ${rejected} malformed entries ignored` : ""}.`,
+  });
 };
 
 export class CancelledError extends Error {}

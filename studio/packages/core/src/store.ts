@@ -15,6 +15,7 @@ import type {
   JobSpec,
   JobStatus,
   ModelConfig,
+  VerificationSummary,
 } from "./types.js";
 
 export interface ModelRecord {
@@ -76,7 +77,19 @@ export interface JobRecord {
   readonly usage: JobUsage;
   readonly projectId?: string;
   readonly pricing?: { analysis?: ModelPricing; build?: ModelPricing };
+  /** Present once the run finished; derived from recorded checks only. */
+  readonly verification?: VerificationSummary;
+  /** The worker that claimed the run, for diagnostics. */
+  readonly workerId?: string;
 }
+
+/** What a run changed: files it wrote or edited and commands it ran. */
+export interface JobChanges {
+  readonly files: readonly { readonly path: string; readonly action: "write" | "edit" }[];
+  readonly commands: readonly string[];
+}
+
+const ACTIVE_STATUSES = "('queued', 'running', 'waiting_approval')";
 
 export interface StoredEvent {
   readonly seq: number;
@@ -179,6 +192,8 @@ export class StudioStore {
       ["models", "pricing_json"],
       ["jobs", "project_id"],
       ["jobs", "pricing_json"],
+      ["jobs", "verification_json"],
+      ["jobs", "worker_id"],
     ]) {
       if (!table || !column) continue;
       const fields = this.db.prepare(`PRAGMA table_info(${table})`).all();
@@ -536,8 +551,8 @@ export class StudioStore {
     return JSON.parse(this.#box.open(text(row, "secrets_enc"))) as JobSecrets;
   }
 
-  /** Atomically move the oldest queued job to running. */
-  claimNextJob(): JobRecord | undefined {
+  /** Atomically move the oldest queued job to running for one worker. */
+  claimNextJob(workerId?: string): JobRecord | undefined {
     const row = this.db
       .prepare(
         "SELECT id FROM jobs WHERE status = 'queued' AND cancel_requested = 0 ORDER BY created_at LIMIT 1",
@@ -547,9 +562,9 @@ export class StudioStore {
     const id = text(row, "id");
     const result = this.db
       .prepare(
-        "UPDATE jobs SET status = 'running', updated_at = ? WHERE id = ? AND status = 'queued'",
+        "UPDATE jobs SET status = 'running', worker_id = ?, updated_at = ? WHERE id = ? AND status = 'queued'",
       )
-      .run(now(), id);
+      .run(workerId ?? null, now(), id);
     return Number(result.changes) === 1 ? this.getJob(id) : undefined;
   }
 
@@ -559,6 +574,14 @@ export class StudioStore {
         "UPDATE jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?",
       )
       .run(status, error ?? null, now(), id);
+  }
+
+  setJobVerification(id: string, verification: VerificationSummary): void {
+    this.db
+      .prepare(
+        "UPDATE jobs SET verification_json = ?, updated_at = ? WHERE id = ?",
+      )
+      .run(JSON.stringify(verification), now(), id);
   }
 
   setJobUsage(id: string, usage: JobUsage): void {
@@ -588,7 +611,10 @@ export class StudioStore {
     return Number(row?.cancel_requested ?? 0) === 1;
   }
 
-  /** Jobs left running by a crashed worker are marked failed on startup. */
+  /**
+   * Jobs left running by a stopped worker are marked failed. Call it only
+   * while holding the worker lock: then no other live worker owns them.
+   */
   failInterruptedJobs(): number {
     const result = this.db
       .prepare(
@@ -621,7 +647,118 @@ export class StudioStore {
             },
           }
         : {}),
+      ...(row.verification_json
+        ? {
+            verification: JSON.parse(
+              String(row.verification_json),
+            ) as VerificationSummary,
+          }
+        : {}),
+      ...(row.worker_id ? { workerId: text(row, "worker_id") } : {}),
     };
+  }
+
+  /**
+   * Forget a finished run: its events, approvals and row. The workspace
+   * folder stays on disk; the caller tells the user where it is.
+   */
+  deleteJob(id: string): JobRecord {
+    const job = this.getJob(id);
+    if (!job) throw new Error("Run not found.");
+    if (["queued", "running", "waiting_approval"].includes(job.status))
+      throw new Error("Only finished runs can be removed.");
+    this.#forgetJobs([id]);
+    return job;
+  }
+
+  /** Forget a project and its finished runs; files on disk stay. */
+  deleteProject(id: string): ProjectRecord {
+    const project = this.getProject(id);
+    if (!project) throw new Error("Project not found.");
+    const active = this.db
+      .prepare(
+        `SELECT id FROM jobs WHERE project_id = ? AND status IN ${ACTIVE_STATUSES} LIMIT 1`,
+      )
+      .get(id);
+    if (active) throw new Error("Finish or cancel this project's active runs first.");
+    const jobs = this.db
+      .prepare("SELECT id FROM jobs WHERE project_id = ?")
+      .all(id)
+      .map((row) => text(row as Row, "id"));
+    this.db.exec("BEGIN");
+    try {
+      this.#forgetJobs(jobs, false);
+      this.db.prepare("DELETE FROM projects WHERE id = ?").run(id);
+      this.db.exec("COMMIT");
+    } catch (cause) {
+      this.db.exec("ROLLBACK");
+      throw cause;
+    }
+    return project;
+  }
+
+  #forgetJobs(ids: readonly string[], transaction = true): void {
+    if (transaction) this.db.exec("BEGIN");
+    try {
+      for (const id of ids) {
+        this.db.prepare("DELETE FROM job_events WHERE job_id = ?").run(id);
+        this.db.prepare("DELETE FROM approvals WHERE job_id = ?").run(id);
+        this.db.prepare("DELETE FROM jobs WHERE id = ?").run(id);
+      }
+      if (transaction) this.db.exec("COMMIT");
+    } catch (cause) {
+      if (transaction) this.db.exec("ROLLBACK");
+      throw cause;
+    }
+  }
+
+  /** Files written or edited (latest action per path) and commands run. */
+  jobChanges(id: string): JobChanges {
+    const files = new Map<string, "write" | "edit">();
+    for (const row of this.db
+      .prepare(
+        "SELECT json_extract(data_json, '$.path') AS path, json_extract(data_json, '$.action') AS action FROM job_events WHERE job_id = ? AND json_extract(data_json, '$.type') = 'file' ORDER BY seq",
+      )
+      .all(id) as Row[]) {
+      const action = text(row, "action") === "edit" ? "edit" : "write";
+      files.set(text(row, "path"), files.get(text(row, "path")) === "write" ? "write" : action);
+    }
+    const commands: string[] = [];
+    for (const row of this.db
+      .prepare(
+        "SELECT json_extract(data_json, '$.input') AS input FROM job_events WHERE job_id = ? AND json_extract(data_json, '$.type') = 'tool-call' AND json_extract(data_json, '$.tool') IN ('run_command', 'start_process', 'run_check') ORDER BY seq",
+      )
+      .all(id) as Row[]) {
+      try {
+        const input = JSON.parse(text(row, "input")) as { command?: unknown };
+        if (typeof input.command === "string") commands.push(input.command);
+      } catch {
+        // Previews of very long inputs are clipped and no longer JSON.
+        commands.push(text(row, "input"));
+      }
+    }
+    return {
+      files: [...files].map(([path, action]) => ({ path, action })),
+      commands,
+    };
+  }
+
+  /** Evidence ids reported by REA results, mapped to their saved files. */
+  evidenceFiles(id: string): Record<string, string> {
+    const map: Record<string, string> = {};
+    for (const row of this.db
+      .prepare(
+        "SELECT data_json FROM job_events WHERE job_id = ? AND json_extract(data_json, '$.type') = 'tool-result' AND json_extract(data_json, '$.savedTo') IS NOT NULL ORDER BY seq",
+      )
+      .all(id) as Row[]) {
+      const event = JSON.parse(text(row, "data_json")) as {
+        savedTo?: string;
+        evidenceIds?: string[];
+      };
+      if (!event.savedTo) continue;
+      for (const evidenceId of event.evidenceIds ?? []) map[evidenceId] ??= event.savedTo;
+    }
+    return map;
   }
 
   // Events ------------------------------------------------------------------

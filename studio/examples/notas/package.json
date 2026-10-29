@@ -1,0 +1,7 @@
+{
+  "name": "reall-example-notas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tiny notes app used as Reall's guided first project.",
+  "main": "src/main.js"
+}

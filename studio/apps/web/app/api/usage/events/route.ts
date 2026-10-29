@@ -1,5 +1,5 @@
 import { guard } from "@/lib/server";
-import { usageSnapshot } from "@/lib/usage";
+import { sharedUsageSnapshot } from "@/lib/usage";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const refused = guard(request);
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
         try {
           controller.enqueue(
             new TextEncoder().encode(
-              `event: usage\ndata: ${JSON.stringify(usageSnapshot(projectId))}\n\n`,
+              `event: usage\ndata: ${JSON.stringify(sharedUsageSnapshot(projectId))}\n\n`,
             ),
           );
         } catch {

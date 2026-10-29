@@ -53,3 +53,18 @@ export function usageSnapshot(projectId = "") {
   };
 }
 export type UsageSnapshot = ReturnType<typeof usageSnapshot>;
+
+const SHARED_MS = 1_500;
+const shared = new Map<string, { at: number; snapshot: UsageSnapshot }>();
+
+/**
+ * Every live connection asks every two seconds; connections watching the
+ * same filter share one snapshot instead of recomputing it each.
+ */
+export function sharedUsageSnapshot(projectId = "", now = Date.now()): UsageSnapshot {
+  const cached = shared.get(projectId);
+  if (cached && now - cached.at < SHARED_MS) return cached.snapshot;
+  const snapshot = usageSnapshot(projectId);
+  shared.set(projectId, { at: now, snapshot });
+  return snapshot;
+}

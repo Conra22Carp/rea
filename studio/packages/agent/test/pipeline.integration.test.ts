@@ -122,4 +122,62 @@ describe.skipIf(!reaAvailable)("runJob with a scripted model and real REA", () =
     expect(everything).not.toContain(PASSWORD);
     expect(events.at(-1)).toMatchObject({ type: "done", status: "succeeded" });
   });
+
+  it("counts as verified only the checks Reall ran during verification", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "studio-verify-"));
+    try {
+      let call = 0;
+      const model = new MockLanguageModelV4({
+        doGenerate: async () => {
+          call += 1;
+          if (call === 1) {
+            return toolCall("v1", "run_check", {
+              name: "unit tests",
+              command: 'node -e "process.exit(0)"',
+              cwd: "output",
+            });
+          }
+          return {
+            content: [{ type: "text" as const, text: "All checks passed." }],
+            finishReason: { unified: "stop" as const, raw: undefined },
+            usage,
+            warnings: [],
+          };
+        },
+      });
+      const events: JobEvent[] = [];
+      const result = await runJob({
+        spec: parseJobSpec({
+          title: "Verify notes search",
+          target: { kind: "javascript", path: fixture },
+          access: { mode: "none" },
+          scope: { mode: "full", description: "" },
+          enhancement: { hardening: ["tests"] },
+          budget: { maxStepsPerPhase: 5 },
+          approvals: { destructiveTools: "auto", commands: "auto", specReview: false },
+          authorizationAttested: true,
+        }),
+        secrets: {},
+        models: {
+          analysis: { provider: "openai", model: "mock", apiKey: API_KEY },
+          build: { provider: "openai", model: "mock", apiKey: API_KEY },
+        },
+        workspaceRoot,
+        emit: (event) => events.push(event),
+        approvals: { request: async () => ({ approved: true }) },
+        signal: new AbortController().signal,
+        createModel: () => model,
+        phases: ["verify"],
+      });
+      expect(result.verification).toEqual({ status: "verified", passed: 1, failed: 0, total: 1 });
+      expect(events.some((event) => event.type === "check" && event.check.passed)).toBe(true);
+      expect(events.at(-1)).toMatchObject({
+        type: "done",
+        status: "succeeded",
+        verification: { status: "verified" },
+      });
+    } finally {
+      await rm(workspaceRoot, { recursive: true, force: true });
+    }
+  });
 });

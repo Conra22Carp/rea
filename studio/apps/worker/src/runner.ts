@@ -3,7 +3,12 @@ import {
   type ApprovalGate,
   type RunJobResult,
 } from "@rea-studio/agent";
-import type { JobRecord, ModelConfig, StudioStore } from "@rea-studio/core";
+import {
+  summarizeChecks,
+  type JobRecord,
+  type ModelConfig,
+  type StudioStore,
+} from "@rea-studio/core";
 import type { LanguageModel } from "ai";
 
 const POLL_MS = 1_000;
@@ -108,6 +113,7 @@ export const processJob = async (
       ...(options.createModel ? { createModel: options.createModel } : {}),
     });
     store.setJobUsage(job.id, result.usage);
+    store.setJobVerification(job.id, result.verification);
     store.setJobStatus(job.id, result.status, result.error);
     return result;
   } catch (cause: unknown) {
@@ -117,11 +123,14 @@ export const processJob = async (
       status: "failed",
       error: message,
     });
+    const verification = summarizeChecks([]);
+    store.setJobVerification(job.id, verification);
     store.setJobStatus(job.id, "failed", message);
     return {
       status: "failed",
       error: message,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      verification,
     };
   } finally {
     clearInterval(watcher);

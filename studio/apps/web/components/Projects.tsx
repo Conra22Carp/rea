@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -9,18 +10,27 @@ import {
   Plus,
   Search,
   Clock3,
+  Lightbulb,
+  Trash2,
 } from "lucide-react";
 import type { JobRecord, ModelRecord, ProjectRecord } from "@rea-studio/core";
+import { api, messageOf } from "@/lib/client";
 import { useLocale, number } from "./Locale";
+import { TryExample } from "./TryExample";
 import {
+  Button,
   Card,
   EmptyState,
+  ErrorNotice,
   Input,
   PageTitle,
   StatusPill,
   Tag,
+  VerificationBadge,
   buttonClass,
 } from "./ui";
+
+const finished = (job: JobRecord) => ["succeeded", "failed", "cancelled"].includes(job.status);
 export function Projects({
   projects,
   jobs,
@@ -76,10 +86,13 @@ export function Projects({
               "Your next idea starts here",
             )}
             action={
-              <Link href="/projects/new" className={buttonClass("primary")}>
-                {t("Crear primer proyecto", "Create first project")}
-                <ArrowRight size={16} />
-              </Link>
+              <div className="form-actions">
+                <TryExample />
+                <Link href="/projects/new" className={buttonClass("primary")}>
+                  {t("Crear primer proyecto", "Create first project")}
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
             }
           >
             {t(
@@ -185,6 +198,31 @@ export function ProjectDetail({
   model?: ModelRecord;
 }) {
   const { t, locale } = useLocale();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const active = jobs.some((job) => !finished(job));
+  async function remove() {
+    if (
+      !confirm(
+        t(
+          `¿Quitar «${project.name}» y sus ejecuciones del historial de Reall? La carpeta ${project.outputDirectory} queda en tu disco.`,
+          `Remove "${project.name}" and its runs from Reall's history? The folder ${project.outputDirectory} stays on your disk.`,
+        ),
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/api/projects/${project.id}`, { method: "DELETE" });
+      router.push("/projects");
+      router.refresh();
+    } catch (cause) {
+      setError(messageOf(cause));
+      setBusy(false);
+    }
+  }
   return (
     <>
       <Link href="/projects" className="back-link">
@@ -193,17 +231,34 @@ export function ProjectDetail({
       <PageTitle
         title={project.name}
         actions={
-          <Link
-            href={`/jobs/new?project=${project.id}`}
-            className={buttonClass("primary")}
-          >
-            <Plus size={16} />
-            {t("Nueva ejecución", "New run")}
-          </Link>
+          <>
+            <Button
+              variant="ghost"
+              busy={busy}
+              disabled={active}
+              onClick={() => void remove()}
+              title={
+                active
+                  ? t("Terminá o cancelá las ejecuciones activas primero", "Finish or cancel active runs first")
+                  : t("Quitar del historial", "Remove from history")
+              }
+              aria-label={t("Quitar proyecto del historial", "Remove project from history")}
+            >
+              <Trash2 size={14} />
+            </Button>
+            <Link
+              href={`/jobs/new?project=${project.id}`}
+              className={buttonClass("primary")}
+            >
+              <Plus size={16} />
+              {t("Nueva ejecución", "New run")}
+            </Link>
+          </>
         }
       >
         {project.description}
       </PageTitle>
+      <ErrorNotice message={error} />
       <div className="project-overview">
         <Card>
           <Cpu size={20} />
@@ -246,13 +301,22 @@ export function ProjectDetail({
             icon={<FolderPlus size={26} />}
             title={t("Todo listo para empezar", "Ready when you are")}
             action={
-              <Link
-                href={`/jobs/new?project=${project.id}`}
-                className={buttonClass("primary")}
-              >
-                {t("Configurar primera ejecución", "Set up first run")}
-                <ArrowRight size={16} />
-              </Link>
+              <div className="form-actions">
+                <Link
+                  href={`/jobs/new?project=${project.id}&example=notas`}
+                  className={buttonClass("ghost")}
+                >
+                  <Lightbulb size={15} />
+                  {t("Usar el ejemplo guiado", "Use the guided example")}
+                </Link>
+                <Link
+                  href={`/jobs/new?project=${project.id}`}
+                  className={buttonClass("primary")}
+                >
+                  {t("Configurar primera ejecución", "Set up first run")}
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
             }
           >
             {t(
@@ -268,6 +332,12 @@ export function ProjectDetail({
                   <strong>{job.title}</strong>
                   <small>
                     {new Date(job.createdAt).toLocaleString(locale)}
+                    {finished(job) && job.verification && (
+                      <>
+                        {" "}
+                        <VerificationBadge verification={job.verification} />
+                      </>
+                    )}
                   </small>
                 </div>
                 <span>{number(job.usage.totalTokens, locale)} tok</span>

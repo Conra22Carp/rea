@@ -1,6 +1,6 @@
 {
   "name": "rea-studio",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Reall: analyze, rebuild, and improve applications with your preferred model.",
   "license": "MIT",
@@ -20,7 +20,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "studio": "node scripts/studio.mjs",
-    "dev": "node scripts/studio.mjs --dev"
+    "dev": "node scripts/studio.mjs --dev",
+    "setup": "node scripts/setup.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

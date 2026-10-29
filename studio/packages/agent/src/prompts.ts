@@ -182,18 +182,19 @@ const PHASE_TASKS: Record<PhaseId, (ctx: PromptContext) => string> = {
     [
       "Phase 4 of 5: VERIFICATION.",
       "Check the rebuild against the original:",
-      "- Run the build and the test suite.",
+      "- Run the build and the test suite with run_check, one check per command, named after what it proves. Only run_check results count as verification; if you fix code, run the check again.",
       ctx.spec.target.kind === "web"
         ? "- Start the rebuilt app with start_process, replay notes/scenario.json against it with the same step_ids (point start_url at the rebuild), and compare both captures with compare_web_captures."
         : "- Where the target can run, capture both with capture_process_scenario and compare with compare_process_captures / verify_reconstruction.",
       "- Walk spec/obligations.json and mark each obligation verified, failed or unverified with the evidence.",
-      "Write spec/verification.md with the results. Stop any processes you started.",
+      "Write spec/verification.md with the results, naming the checks you recorded. Stop any processes you started.",
     ].join("\n"),
   report: () =>
     [
       "Phase 5 of 5: REPORT.",
       "Write output/REPORT.md for the user: what was cloned, how the enhancement was applied, how to run it, verification results per obligation, known gaps and unknowns, and the evidence it relies on.",
-      "Be factual: say what was not verified.",
+      'Also write output/findings.json: a JSON array of { "claim": one sentence, "kind": "observed" (seen in REA evidence) | "inferred" (your conclusion) | "unknown" (open question), "evidence": [ev_… ids or evidence/ file paths], "check": optional name of a run_check that tests it }.',
+      "Be factual: say what was not verified. Never mark an inference as observed.",
     ].join("\n"),
 };
 

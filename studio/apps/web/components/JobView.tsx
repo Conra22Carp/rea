@@ -1,11 +1,14 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { diffLines } from "diff";
 import {
   Activity,
   ArrowLeft,
   ArrowUp,
+  Bell,
+  BellOff,
   Check,
   Circle,
   Clock3,
@@ -16,19 +19,27 @@ import {
   Folder,
   FolderOpen,
   GitCompareArrows,
+  Lightbulb,
+  ListChecks,
   Radio,
   RefreshCw,
+  Repeat2,
   ShieldCheck,
   Square,
   Terminal,
+  Trash2,
 } from "lucide-react";
 import type {
   ApprovalRecord,
+  Finding,
+  FindingKind,
   JobRecord,
   StoredEvent,
   PhaseId,
 } from "@rea-studio/core";
-import { api, post } from "@/lib/client";
+import { translateMessage } from "@rea-studio/core/messages";
+import type { JobDetails } from "@/lib/job-details";
+import { api, post, messageOf } from "@/lib/client";
 import { dollars, number, useLocale } from "./Locale";
 import {
   Button,
@@ -36,8 +47,11 @@ import {
   EmptyState,
   ErrorNotice,
   PageTitle,
+  PriceAge,
   StatusPill,
+  Tag,
   Textarea,
+  VerificationBadge,
   buttonClass,
 } from "./ui";
 import { Markdown } from "./Markdown";
@@ -52,17 +66,24 @@ interface FileResult {
 }
 const terminal = (job: JobRecord) =>
   ["succeeded", "failed", "cancelled"].includes(job.status);
+const NOTIFY_KEY = "reall-notify";
 export function JobView({
   initial,
   initialApprovals,
+  initialDetails,
   previousId,
 }: {
   initial: JobRecord;
   initialApprovals: ApprovalRecord[];
+  initialDetails: JobDetails;
   previousId?: string;
 }) {
   const { t, locale } = useLocale();
+  const router = useRouter();
   const [job, setJob] = useState(initial);
+  const [details, setDetails] = useState(initialDetails);
+  const [notify, setNotify] = useState(false);
+  const lastStatus = useRef(initial.status);
   const [events, setEvents] = useState<StoredEvent[]>([]);
   const newestEvents = events.slice().reverse();
   const [approvals, setApprovals] = useState(initialApprovals);
@@ -87,11 +108,95 @@ export function JobView({
     ["report", t("Informe", "Report")],
   ] as const;
   async function refresh() {
-    const result = await api<{ job: JobRecord; approvals: ApprovalRecord[] }>(
-      `/api/jobs/${initial.id}`,
-    );
+    const result = await api<{
+      job: JobRecord;
+      approvals: ApprovalRecord[];
+      details: JobDetails;
+    }>(`/api/jobs/${initial.id}`);
     setJob(result.job);
     setApprovals(result.approvals);
+    setDetails(result.details);
+  }
+  // Notifications are opt-in per browser; the choice is a local convenience.
+  useEffect(() => {
+    try {
+      setNotify(
+        localStorage.getItem(NOTIFY_KEY) === "1" &&
+          typeof Notification !== "undefined" &&
+          Notification.permission === "granted",
+      );
+    } catch {
+      setNotify(false);
+    }
+  }, []);
+  // The tab title says when a run needs the user or has finished.
+  useEffect(() => {
+    const needsReview = job.status === "waiting_approval";
+    const prefix = needsReview
+      ? t("● Requiere revisión", "● Needs review")
+      : terminal(job)
+        ? t("✓ Terminado", "✓ Finished")
+        : t("En ejecución", "Running");
+    document.title = `${prefix} · ${job.title} · Reall`;
+    const changed = lastStatus.current !== job.status;
+    lastStatus.current = job.status;
+    if (changed && notify && (needsReview || terminal(job))) {
+      try {
+        new Notification(`Reall · ${job.title}`, {
+          body: needsReview
+            ? t("La ejecución espera tu revisión.", "The run is waiting for your review.")
+            : t("La ejecución terminó.", "The run has finished."),
+        });
+      } catch {
+        // Notifications unavailable in this context.
+      }
+    }
+  }, [job, notify, t]);
+  async function toggleNotify() {
+    if (notify) {
+      setNotify(false);
+      try {
+        localStorage.setItem(NOTIFY_KEY, "0");
+      } catch {
+        // Private mode: the choice lasts for this page only.
+      }
+      return;
+    }
+    if (typeof Notification === "undefined") {
+      setError(t("Este navegador no admite notificaciones.", "This browser does not support notifications."));
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    const granted = permission === "granted";
+    setNotify(granted);
+    if (!granted)
+      setError(t("El navegador no permitió notificaciones.", "The browser did not allow notifications."));
+    try {
+      localStorage.setItem(NOTIFY_KEY, granted ? "1" : "0");
+    } catch {
+      // Private mode: the choice lasts for this page only.
+    }
+  }
+  async function removeFromHistory() {
+    if (
+      !confirm(
+        t(
+          `¿Quitar esta ejecución del historial de Reall? Sus archivos quedan en ${job.workspace}.`,
+          `Remove this run from Reall's history? Its files stay in ${job.workspace}.`,
+        ),
+      )
+    )
+      return;
+    setBusy("remove");
+    setError("");
+    try {
+      await api(`/api/jobs/${job.id}`, { method: "DELETE" });
+      router.push(job.projectId ? `/projects/${job.projectId}` : "/projects");
+      router.refresh();
+    } catch (cause) {
+      setError(messageOf(cause));
+      setBusy("");
+    }
   }
   useEffect(() => {
     const source = new EventSource(
@@ -110,15 +215,15 @@ export function JobView({
           [eventData.phase]: eventData.status,
         }));
       if (stored.event.type === "approval")
-        void refresh().catch((cause) => setError(String(cause)));
+        void refresh().catch((cause) => setError(messageOf(cause)));
     });
     source.addEventListener("status", () => {
-      void refresh().catch((cause) => setError(String(cause)));
+      void refresh().catch((cause) => setError(messageOf(cause)));
     });
     source.addEventListener("end", () => {
       setConnected(false);
       source.close();
-      void refresh().catch((cause) => setError(String(cause)));
+      void refresh().catch((cause) => setError(messageOf(cause)));
     });
     source.onerror = () => setConnected(false);
     return () => source.close();
@@ -136,7 +241,7 @@ export function JobView({
         setFile(undefined);
       } else setFile(result);
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy("");
     }
@@ -169,7 +274,7 @@ export function JobView({
       });
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy("");
     }
@@ -188,6 +293,29 @@ export function JobView({
         actions={
           <>
             <StatusPill status={job.status} />
+            {terminal(job) && job.verification && (
+              <VerificationBadge verification={job.verification} />
+            )}
+            {terminal(job) && job.projectId && (
+              <Link
+                href={`/jobs/new?project=${job.projectId}&from=${job.id}`}
+                className={buttonClass("ghost")}
+              >
+                <Repeat2 size={14} />
+                {t("Repetir", "Run again")}
+              </Link>
+            )}
+            {terminal(job) && (
+              <Button
+                variant="ghost"
+                busy={busy === "remove"}
+                onClick={() => void removeFromHistory()}
+                aria-label={t("Quitar del historial", "Remove from history")}
+                title={t("Quitar del historial", "Remove from history")}
+              >
+                <Trash2 size={14} />
+              </Button>
+            )}
             {!terminal(job) && (
               <Button
                 variant="ghost"
@@ -207,7 +335,7 @@ export function JobView({
                     await post(`/api/jobs/${job.id}/cancel`, {});
                     await refresh();
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(messageOf(cause));
                   } finally {
                     setBusy("");
                   }
@@ -232,7 +360,31 @@ export function JobView({
           "Follow the work, review decisions, and explore generated code.",
         )}
       </PageTitle>
-      <ErrorNotice message={error || job.error} />
+      <div className="run-policy" aria-label={t("Permisos de esta ejecución", "Permissions for this run")}>
+        <ShieldCheck size={14} />
+        <Tag>
+          {job.spec.approvals.commands === "auto"
+            ? t("Autorización completa", "Full authorization")
+            : t("Aprobación paso por paso", "Step-by-step approval")}
+        </Tag>
+        <Tag>
+          {job.spec.approvals.specReview
+            ? t("Con revisión de especificación", "Specification review on")
+            : t("Sin revisión de especificación", "No specification review")}
+        </Tag>
+        <span className="run-policy-note">
+          {job.spec.approvals.commands === "auto"
+            ? t(
+                "Comandos y herramientas corren sin pedir aprobación, con los permisos de tu usuario.",
+                "Commands and tools run without asking, with your user's permissions.",
+              )
+            : t(
+                "Reall pide aprobación antes de cada comando y herramienta destructiva.",
+                "Reall asks before every command and destructive tool.",
+              )}
+        </span>
+      </div>
+      <ErrorNotice message={error || (job.error ? translateMessage(job.error, locale) : undefined)} />
       <div className="run-metrics">
         <div>
           <span>{t("Entrada", "Input")}</span>
@@ -255,6 +407,7 @@ export function JobView({
               {t("Incluye tokens sin tarifa", "Includes unpriced tokens")}
             </small>
           )}
+          {job.pricing?.build && <PriceAge pricing={job.pricing.build} />}
         </div>
         <div>
           <span>{t("Presupuesto de tokens", "Token budget")}</span>
@@ -290,6 +443,111 @@ export function JobView({
           );
         })}
       </div>
+      {(details.checks.length > 0 || terminal(job)) && (
+        <Card className="verification-card">
+          <div className="section-heading">
+            <div>
+              <h2>{t("Verificación", "Verification")}</h2>
+              <p className="field-hint">
+                {t(
+                  "Solo cuentan los checks que Reall ejecutó y registró con su código de salida; no lo que diga el informe.",
+                  "Only checks Reall ran and recorded with their exit code count; not what the report says.",
+                )}
+              </p>
+            </div>
+            {job.verification && <VerificationBadge verification={job.verification} />}
+          </div>
+          {details.checks.length === 0 ? (
+            <p className="verification-empty">
+              {t(
+                "Esta ejecución no registró checks: el resultado no está verificado.",
+                "This run recorded no checks: the result is not verified.",
+              )}
+            </p>
+          ) : (
+            <ul className="check-list">
+              {details.checks.map((check, index) => (
+                <li key={`${check.name}-${index}`} className={check.passed ? "passed" : "failed"}>
+                  <span className="check-mark">
+                    {check.passed ? <Check size={13} /> : <Square size={11} />}
+                  </span>
+                  <div>
+                    <strong>{check.name}</strong>
+                    <code>{check.command}</code>
+                    <small>
+                      {check.passed ? t("Pasó", "Passed") : t("Falló", "Failed")} ·{" "}
+                      {t("código", "exit code")} {check.exitCode ?? "—"}
+                      {check.timedOut ? ` · ${t("tiempo agotado", "timed out")}` : ""} ·{" "}
+                      {(check.durationMs / 1000).toFixed(1)} s
+                    </small>
+                    {check.outputTail && (
+                      <details>
+                        <summary>{t("Ver salida", "View output")}</summary>
+                        <pre>{check.outputTail}</pre>
+                      </details>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {terminal(job) && (
+        <Card className="changes-card">
+          <div className="section-heading">
+            <div>
+              <h2>{t("Qué cambió", "What changed")}</h2>
+              <p className="field-hint">
+                {t(
+                  `${details.changes.files.length} archivos escritos o editados · ${details.changes.commands.length} comandos ejecutados`,
+                  `${details.changes.files.length} files written or edited · ${details.changes.commands.length} commands run`,
+                )}
+              </p>
+            </div>
+            <ListChecks size={22} />
+          </div>
+          <div className="changes-grid">
+            <div>
+              <h3>{t("Archivos", "Files")}</h3>
+              {details.changes.files.length === 0 ? (
+                <p className="field-hint">{t("Ninguno.", "None.")}</p>
+              ) : (
+                <ul>
+                  {details.changes.files.slice(0, 40).map((entry) => (
+                    <li key={entry.path}>
+                      <button
+                        className="text-link"
+                        onClick={() => {
+                          setTab("files");
+                          void browse(entry.path);
+                        }}
+                      >
+                        {entry.path}
+                      </button>
+                      <small>{entry.action === "edit" ? t("editado", "edited") : t("escrito", "written")}</small>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3>{t("Comandos", "Commands")}</h3>
+              {details.changes.commands.length === 0 ? (
+                <p className="field-hint">{t("Ninguno.", "None.")}</p>
+              ) : (
+                <ul>
+                  {details.changes.commands.slice(0, 40).map((command, index) => (
+                    <li key={index}>
+                      <code>{command}</code>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
       {approvals
         .filter((approval) => approval.status === "pending")
         .map((approval) => (
@@ -373,6 +631,25 @@ export function JobView({
           <FileText size={16} />
           {t("Informe", "Report")}
         </button>
+        <button
+          aria-pressed={tab === "learned"}
+          onClick={() => void selectTab("learned")}
+        >
+          <Lightbulb size={16} />
+          {t("Qué aprendimos", "What we learned")}
+        </button>
+        <button
+          className="notify-toggle"
+          aria-pressed={notify}
+          onClick={() => void toggleNotify()}
+          title={t(
+            "Avisarme cuando pida revisión o termine",
+            "Notify me when it needs review or finishes",
+          )}
+        >
+          {notify ? <Bell size={15} /> : <BellOff size={15} />}
+          {notify ? t("Avisos activados", "Alerts on") : t("Avisarme", "Notify me")}
+        </button>
         <span className={`live-indicator ${connected ? "connected" : ""}`}>
           <Radio size={13} />
           {terminal(job)
@@ -421,6 +698,8 @@ export function JobView({
                               ? t("Consumo actualizado", "Usage updated")
                               : event.type === "file"
                                 ? event.path
+                                : event.type === "check"
+                                  ? `${t("Check", "Check")}: ${event.check.name}`
                                 : event.type === "done"
                                   ? t("Ejecución finalizada", "Run finished")
                                   : event.type === "approval"
@@ -482,9 +761,14 @@ export function JobView({
                         )}
                       </details>
                     ) : event.type === "phase" && event.summary ? (
-                      <p>{event.summary}</p>
+                      <p>{translateMessage(event.summary, locale)}</p>
+                    ) : event.type === "check" ? (
+                      <p>
+                        {event.check.passed ? t("Pasó", "Passed") : t("Falló", "Failed")} ·{" "}
+                        <code>{event.check.command}</code>
+                      </p>
                     ) : event.type === "done" && event.error ? (
-                      <p>{event.error}</p>
+                      <p>{translateMessage(event.error, locale)}</p>
                     ) : event.type === "approval" ? (
                       <p>{event.title}</p>
                     ) : null}
@@ -631,6 +915,15 @@ export function JobView({
           </div>
         </Card>
       )}
+      {tab === "learned" && (
+        <Learned
+          details={details}
+          openFile={(path) => {
+            setTab("files");
+            void browse(path);
+          }}
+        />
+      )}
       {tab === "report" && (
         <Card>
           {report ? (
@@ -656,5 +949,108 @@ export function JobView({
         </Card>
       )}
     </>
+  );
+}
+
+const KINDS: readonly FindingKind[] = ["observed", "inferred", "unknown"];
+
+/** Claims from output/findings.json, each linked to its evidence and check. */
+function Learned({
+  details,
+  openFile,
+}: {
+  details: JobDetails;
+  openFile: (path: string) => void;
+}) {
+  const { t } = useLocale();
+  const kindLabel: Record<FindingKind, [string, string]> = {
+    observed: [t("Observado", "Observed"), t("Visto en la evidencia de REA.", "Seen in REA evidence.")],
+    inferred: [t("Inferido", "Inferred"), t("Conclusión del modelo a partir de la evidencia.", "The model's conclusion from the evidence.")],
+    unknown: [t("Desconocido", "Unknown"), t("Pregunta abierta: falta evidencia.", "Open question: evidence is missing.")],
+  };
+  // An evidence entry is a saved file or an ev_… id that a REA result reported.
+  const resolve = (entry: string): string | undefined =>
+    entry.includes("/") ? entry : details.evidenceFiles[entry];
+  const checkFor = (finding: Finding) =>
+    finding.check
+      ? [...details.checks].reverse().find((check) => check.name === finding.check)
+      : undefined;
+  if (!details.hasFindings || details.findings.length === 0)
+    return (
+      <Card>
+        <EmptyState
+          icon={<Lightbulb size={27} />}
+          title={t("Todavía no hay afirmaciones estructuradas", "No structured claims yet")}
+        >
+          {details.hasFindings
+            ? t(
+                "El informe escribió output/findings.json, pero ninguna entrada era válida.",
+                "The report wrote output/findings.json, but no entry was valid.",
+              )
+            : t(
+                "Aparecen cuando la fase de informe escribe output/findings.json. Mientras tanto, revisá el informe y la evidencia en Archivos.",
+                "They appear when the report phase writes output/findings.json. Meanwhile, review the report and the evidence under Files.",
+              )}
+        </EmptyState>
+      </Card>
+    );
+  return (
+    <div className="learned">
+      {details.findingsRejected > 0 && (
+        <p className="field-hint">
+          {t(
+            `${details.findingsRejected} entradas mal formadas no se muestran.`,
+            `${details.findingsRejected} malformed entries are not shown.`,
+          )}
+        </p>
+      )}
+      {KINDS.map((kind) => {
+        const items = details.findings.filter((finding) => finding.kind === kind);
+        if (items.length === 0) return null;
+        return (
+          <Card key={kind} className={`learned-group learned-${kind}`}>
+            <div className="section-heading">
+              <div>
+                <h2>
+                  {kindLabel[kind][0]} <small>{items.length}</small>
+                </h2>
+                <p className="field-hint">{kindLabel[kind][1]}</p>
+              </div>
+            </div>
+            <ul>
+              {items.map((finding, index) => {
+                const check = checkFor(finding);
+                return (
+                  <li key={index}>
+                    <p>{finding.claim}</p>
+                    <div className="learned-links">
+                      {finding.evidence.map((entry) => {
+                        const path = resolve(entry);
+                        return path ? (
+                          <button key={entry} className="text-link" onClick={() => openFile(path)}>
+                            {entry}
+                          </button>
+                        ) : (
+                          <code key={entry} title={t("Evidencia no encontrada en esta ejecución", "Evidence not found in this run")}>
+                            {entry}
+                          </code>
+                        );
+                      })}
+                      {finding.check && (
+                        <span className={`learned-check ${check ? (check.passed ? "passed" : "failed") : "missing"}`}>
+                          {check
+                            ? `${finding.check} · ${check.passed ? t("pasó", "passed") : t("falló", "failed")}`
+                            : `${finding.check} · ${t("sin registrar", "not recorded")}`}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        );
+      })}
+    </div>
   );
 }

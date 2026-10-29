@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { ArrowUp, Folder, FolderOpen, X } from "lucide-react";
-import { api } from "@/lib/client";
+import { api, messageOf } from "@/lib/client";
 import { useLocale } from "./Locale";
 import { Button, ErrorNotice, Input } from "./ui";
 interface Listing {
@@ -33,7 +33,7 @@ export function DirectoryPicker({
       setListing(result);
       setAddress(result.path);
     } catch (cause) {
-      setError(String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy(false);
     }

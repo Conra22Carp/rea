@@ -27,6 +27,6 @@ export async function POST(request: Request) {
       return badRequest("Model not found.");
     return json({ settings: getStore().saveSettings(settings) });
   } catch (cause) {
-    return badRequest(errorText(cause));
+    return badRequest(errorText(cause, request));
   }
 }

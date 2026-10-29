@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import { CHECKS_FILE, type VerificationCheck } from "@rea-studio/core";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
@@ -333,7 +334,12 @@ const instrumented = async (
 export interface WorkspaceToolOptions {
   readonly write: boolean;
   readonly commands: boolean;
+  /** Offer run_check; every recorded check is reported here. */
+  readonly onCheck?: (check: VerificationCheck) => void;
 }
+
+const tailOf = (output: string, chars: number): string =>
+  output.length > chars ? `… [earlier output omitted]\n${output.slice(-chars)}` : output;
 
 /** File and command tools confined to one job workspace. */
 export const workspaceTools = (
@@ -476,11 +482,7 @@ export const workspaceTools = (
             input.timeout_seconds * 1_000,
             ctx.signal,
           );
-          const tail =
-            result.output.length > 12_000
-              ? `… [earlier output omitted]\n${result.output.slice(-12_000)}`
-              : result.output;
-          return `exit code: ${result.exitCode ?? "none"}${result.timedOut ? " (timed out)" : ""}\n${tail}`;
+          return `exit code: ${result.exitCode ?? "none"}${result.timedOut ? " (timed out)" : ""}\n${tailOf(result.output, 12_000)}`;
         }),
     });
     tools.start_process = tool({
@@ -528,5 +530,62 @@ export const workspaceTools = (
     });
   }
 
+  const onCheck = options.onCheck;
+  if (onCheck) {
+    tools.run_check = tool({
+      description: `Run one verification check (build, test suite, lint) and record its exit code in ${CHECKS_FILE}. Only checks recorded with this tool count as verification; run_command results do not. Name each check after what it proves, for example "unit tests" or "build".`,
+      inputSchema: z.object({
+        name: z.string().trim().min(1).max(200),
+        command: z.string().min(1),
+        cwd: z.string().default("output"),
+        timeout_seconds: z.number().int().min(1).max(1_800).default(600),
+      }),
+      execute: (input, { toolCallId }) =>
+        instrumented(ctx, "run_check", toolCallId, input, async () => {
+          const decision = await approve(
+            ctx,
+            "command",
+            `Check "${input.name}": ${input.command}`,
+            `Working directory: ${input.cwd}`,
+          );
+          if (!decision.approved) {
+            return `The user declined this check; it was not run and does not count as verification.${decision.note ? ` Note: ${decision.note}` : ""}`;
+          }
+          const started = Date.now();
+          const result = await ws.run(
+            input.command,
+            input.cwd,
+            input.timeout_seconds * 1_000,
+            ctx.signal,
+          );
+          const check: VerificationCheck = {
+            name: input.name,
+            command: ctx.redactor.redact(input.command),
+            cwd: input.cwd,
+            exitCode: result.exitCode,
+            passed: result.exitCode === 0 && !result.timedOut,
+            timedOut: result.timedOut,
+            durationMs: Date.now() - started,
+            outputTail: ctx.redactor.redact(tailOf(result.output, 4_000)),
+            finishedAt: new Date().toISOString(),
+          };
+          await recordCheck(ws, check);
+          ctx.emit({ type: "check", phase: ctx.phase, check });
+          onCheck(check);
+          return `check "${check.name}": ${check.passed ? "passed" : "failed"} (exit code ${check.exitCode ?? "none"}${check.timedOut ? ", timed out" : ""})\n${tailOf(result.output, 12_000)}`;
+        }),
+    });
+  }
+
   return tools;
+};
+
+/** Append a check to the run's log; logs/ is not writable by the model. */
+const recordCheck = async (ws: Workspace, check: VerificationCheck): Promise<void> => {
+  const path = ws.path(CHECKS_FILE);
+  const existing = await readFile(path, "utf8")
+    .then((source) => JSON.parse(source) as VerificationCheck[])
+    .catch(() => [] as VerificationCheck[]);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify([...existing, check], null, 2), "utf8");
 };

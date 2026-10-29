@@ -124,6 +124,6 @@ export async function POST(request: Request) {
     });
     return json({ job }, 201);
   } catch (cause) {
-    return badRequest(errorText(cause));
+    return badRequest(errorText(cause, request));
   }
 }
