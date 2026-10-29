@@ -1,9 +1,4 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -69,10 +64,3 @@ export const createSecretBox = (key: Buffer): SecretBox => ({
     return Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8");
   },
 });
-
-/** Constant-time string comparison for tokens. */
-export const safeEqual = (a: string, b: string): boolean => {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
-};

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -10,7 +10,8 @@ import { parseJobSpec } from "./validation.js";
 const roots: string[] = [];
 const stores: StudioStore[] = [];
 const open = () => {
-  const root = mkdtempSync(join(tmpdir(), "reall-projects-"));
+  // The store resolves symlinks; on macOS tmpdir() is under the /var symlink.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "reall-projects-")));
   roots.push(root);
   const store = new StudioStore(root);
   stores.push(store);

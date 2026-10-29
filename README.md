@@ -2,7 +2,9 @@
 
 **Una forma más accesible de explorar cómo funciona una aplicación y trabajar sobre sus posibilidades.**
 
-[Guía breve](docs/reall/guia.md) · [Instalación](studio/README.md#inicio-local) · [Auditoría y mejoras](docs/reall/auditoria.md) · [Presentación y anuncio](docs/reall/presentacion.md) · [English](#english)
+[Guía breve](docs/reall/guia.md) · [Instalación](studio/README.md#inicio-local) · [Próximos pasos](#próximos-pasos) · [English](#english)
+
+> **Estado: v0.** Primera versión pública; la voy a seguir iterando.
 
 Reall es un **fork independiente de [REA — Reverse Engineer Anything](https://github.com/morluto/rea)**,
 creado por **[Artesia by Conra](https://artesia.ar)**. REA aporta el motor de
@@ -31,8 +33,7 @@ que cualquier resultado generado por IA sea correcto o esté completamente expli
 REA sigue siendo el responsable de las capacidades de ingeniería inversa. Este
 fork añade una aplicación en [`studio/`](studio/README.md) y un agente que usa
 esas herramientas con el modelo que elijas. Los archivos del motor heredado en
-`src/`, `tests/` y `scripts/` no fueron modificados en los commits de Reall
-auditados hasta `9060c93cb`.
+`src/`, `tests/` y `scripts/` no fueron modificados por este fork.
 
 ## Cómo se usa
 
@@ -87,7 +88,7 @@ La experiencia busca responder cuatro preguntas:
 
 Hoy la evidencia se puede explorar como archivos y los informes se generan con
 IA. Falta convertir esa información en explicaciones breves, enlazadas y fáciles
-de evaluar. Esa es una de las prioridades de la [hoja de mejoras](docs/reall/auditoria.md#prioridades-de-mejora).
+de evaluar. Esa es una de las [próximas prioridades](#próximos-pasos).
 
 ## Estado y límites actuales
 
@@ -107,14 +108,21 @@ la aplicación no es un entorno aislado de ejecución.
 
 Usá aplicaciones propias o para las que tengas autorización. La reconstrucción
 puede ser parcial; las capacidades dependen del objetivo, el modelo y las
-herramientas instaladas. La auditoría distingue [lo verificado y lo pendiente](docs/reall/auditoria.md#alcance-y-validación).
+herramientas instaladas.
+
+## Próximos pasos
+
+1. Separar «ejecución terminada» de «resultado verificado», mostrando qué pruebas pasaron, fallaron o no se ejecutaron.
+2. CI propia para `studio/` y protección contra dos instancias sobre los mismos datos.
+3. Un primer proyecto guiado con un ejemplo propio, sin datos reales.
+4. Chequeo de dependencias antes de gastar tokens y versión visible en la interfaz.
+5. Una vista «Qué aprendimos» que enlace cada afirmación con su evidencia.
+6. Instalación más simple, probada en máquinas limpias.
 
 ## Documentación de Reall
 
 - [Guía para empezar y entender los resultados](docs/reall/guia.md).
 - [Instalación y referencia técnica](studio/README.md).
-- [Auditoría, hallazgos y prioridades de mejora](docs/reall/auditoria.md).
-- [Guion de presentación y borradores para Twitter/X](docs/reall/presentacion.md).
 
 ## Autoría y licencia
 
@@ -135,7 +143,7 @@ pricing, output folders, per-run permissions, live usage, and access to evidence
 and generated reports.
 
 The goal is to make REA's capabilities more approachable and explainable for
-people with less technical experience. This is an ongoing effort: installation
+people with less technical experience. This is a v0 and will keep iterating: installation
 still requires a terminal, and generated results need human review. A completed
 run does not certify a successful reconstruction. Remote model APIs receive the
 context required for their calls; local operation does not mean fully offline.

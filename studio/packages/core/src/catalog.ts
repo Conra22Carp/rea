@@ -84,8 +84,6 @@ export const LANGUAGES = [
   { id: "swift", label: "Swift", frameworks: ["Vapor", "SwiftUI"] },
 ] as const;
 
-export type LanguageId = (typeof LANGUAGES)[number]["id"];
-
 export const HARDENING_OPTIONS = [
   { id: "tests", label: "Automated tests" },
   { id: "security", label: "Security hardening" },
@@ -151,9 +149,6 @@ export const PHASES = [
 ] as const;
 
 export type PhaseId = (typeof PHASES)[number]["id"];
-
-export const isTargetKind = (value: unknown): value is TargetKind =>
-  TARGET_KINDS.some((kind) => kind.id === value);
 
 export const isProviderId = (value: unknown): value is ProviderId =>
   PROVIDERS.some((provider) => provider.id === value);

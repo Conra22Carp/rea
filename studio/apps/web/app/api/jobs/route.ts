@@ -17,12 +17,6 @@ import { badRequest, errorText, getStore, guard, json } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  const refused = guard(request);
-  if (refused) return refused;
-  return json({ jobs: getStore().listJobs() });
-}
-
 interface JobPayload {
   spec?: Record<string, unknown>;
   secrets?: { username?: string; password?: string; cookiesJson?: string };

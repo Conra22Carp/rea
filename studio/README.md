@@ -191,8 +191,6 @@ npm run build
 
 Las pruebas incluyen cifrado, migración de datos anteriores, carpetas de
 proyectos, presupuestos, tarifas/caché y un flujo con REA real y modelo simulado.
-La validación del navegador cubre configuración, creación de proyecto, elección
-de carpeta, las cinco pantallas, aprobación SSE, archivos, informe, ZIP y consumo.
 Una prueba con un modelo simulado no verifica la calidad ni compatibilidad de
 un proveedor real. Para una validación de reconstrucción completa, configurá tus
 proveedores y ejecutá el build, tests y comparación de escenarios del proyecto

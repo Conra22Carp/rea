@@ -6,7 +6,7 @@ import {
   SCOPE_MODES,
   TARGET_KINDS,
 } from "./catalog.js";
-import type { CookieDescriptor, JobSecrets, JobSpec } from "./types.js";
+import type { CookieDescriptor, JobSpec } from "./types.js";
 
 const ids = <T extends readonly { id: string }[]>(items: T) =>
   items.map((item) => item.id) as [T[number]["id"], ...T[number]["id"][]];
@@ -136,8 +136,3 @@ export const splitCookieExport = (
     values: cookies.map(({ value }) => value),
   };
 };
-
-export const secretValues = (secrets: JobSecrets): string[] =>
-  [secrets.username, secrets.password, ...(secrets.cookieValues ?? [])].filter(
-    (value): value is string => typeof value === "string" && value.length > 0,
-  );

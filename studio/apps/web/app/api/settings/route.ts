@@ -2,11 +2,6 @@ import { isAbsolute } from "node:path";
 import { z } from "zod";
 import { badRequest, errorText, getStore, guard, json } from "@/lib/server";
 export const dynamic = "force-dynamic";
-export async function GET(request: Request) {
-  const refused = guard(request);
-  if (refused) return refused;
-  return json({ settings: getStore().getSettings() });
-}
 export async function POST(request: Request) {
   const refused = guard(request);
   if (refused) return refused;

@@ -6,12 +6,6 @@ import { badRequest, errorText, getStore, guard, json } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  const refused = guard(request);
-  if (refused) return refused;
-  return json({ models: getStore().listModels() });
-}
-
 const createModelSchema = z.object({
   name: z.string().trim().max(200).optional(),
   provider: z.string().optional(),
